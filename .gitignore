@@ -13,3 +13,7 @@ assets/
 
 # jetbrains
 .idea/
+
+# compilation artifacts
+obj/
+bin/
