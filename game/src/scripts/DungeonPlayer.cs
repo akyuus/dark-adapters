@@ -1,5 +1,7 @@
 using System;
-using DarkAdapters.model;
+using System.Collections.Generic;
+using DarkAdapters.model.state;
+using DarkAdapters.model.state.dungeonplayerstates;
 using Godot;
 
 namespace DarkAdapters.scripts
@@ -7,77 +9,58 @@ namespace DarkAdapters.scripts
     public class DungeonPlayer : Spatial
     {
         // time it takes to rotate 90 degrees
-        private const float RotationTime = 0.3f;
+        private readonly Dictionary<DungeonPlayerState, IState<DungeonPlayer>> _states;
 
-        private bool _isRotating;
+        private IState<DungeonPlayer> _currentState;
 
-        // represents the original rotation quaternion
-        private Quat _originalQuat;
+        public DungeonPlayer()
+        {
+            _states = new Dictionary<DungeonPlayerState, IState<DungeonPlayer>>();
+            foreach (DungeonPlayerState stateId in Enum.GetValues(typeof(DungeonPlayerState)))
+            {
+                IState<DungeonPlayer>? state;
+                switch (stateId)
+                {
+                    case DungeonPlayerState.Default:
+                        state = new DungeonPlayerDefaultState(this);
+                        break;
+                    case DungeonPlayerState.Rotating:
+                        state = new DungeonPlayerRotatingState(this);
+                        break;
+                    default:
+                        state = new DungeonPlayerDefaultState(this);
+                        break;
+                }
 
-        // how much time has elapsed, if the player is currently rotating
-        private float _rotationTimeElapsed;
+                if (_states != null) _states[stateId] = state;
+            }
 
-        // represents the target quaternion. this is used when the player hits left or right
-        private Quat _targetQuat;
+            _currentState = _states![DungeonPlayerState.Default];
+        }
+
+        public IReadOnlyDictionary<DungeonPlayerState, IState<DungeonPlayer>> States => _states;
+
 
         // Called when the node enters the scene tree for the first time.
         public override void _Ready()
         {
         }
 
+        private void _handleInput(float delta)
+        {
+            var newState = _currentState.HandleInput(delta);
+            if (newState != null)
+            {
+                _currentState.Exit();
+                _currentState = newState;
+                _currentState.Enter();
+            }
+        }
+
         public override void _Process(float delta)
         {
             _handleInput(delta);
-            if (_isRotating)
-            {
-                // if the player is currently rotating 
-                _interpolateRotationQuat(delta);
-            }
-        }
-
-        private void _handleInput(float delta)
-        {
-            
-            if (Input.IsActionJustPressed(InputUtils.InputStringMap[ActionNames.DungeonPlayerLeft]))
-            {
-                if (!_isRotating)
-                {
-                    // start rotating
-                    _isRotating = true;
-                    _targetQuat = Transform.basis.Rotated(Vector3.Up, Mathf.Tau / 4).Quat();
-                    _originalQuat = Transform.basis.Quat();
-                }
-            }
-            if (Input.IsActionJustPressed(InputUtils.InputStringMap[ActionNames.DungeonPlayerRight]))
-            {
-                if (!_isRotating)
-                {
-                    _isRotating = true;
-                    _targetQuat = Transform.basis.Rotated(Vector3.Up, -Mathf.Tau / 4).Quat();
-                    _originalQuat = Transform.basis.Quat();
-                }
-            }
-        }
-
-        private void _interpolateRotationQuat(float delta)
-        {
-            /*
-             * basic idea: interpolate between our original and target quats using the time elapsed and the total
-             * rotation time. then set our transform to a new transform with its basis constructed using that interpolated
-             * quat. we set _isRotating and _rotationTimeElapsed back to their defaults if t is very close to 1; i.e.
-             * the interpolation is complete
-             */
-            _rotationTimeElapsed += delta;
-            var t = Mathf.Clamp(_rotationTimeElapsed / RotationTime, 0, 1f);
-            var transform = Transform;
-            var newQuat = _originalQuat.Slerp(_targetQuat, t);
-            transform.basis = new Basis(newQuat);
-            Transform = transform;
-            if (Math.Abs(1f - t) < 0.0000001)
-            {
-                _isRotating = false;
-                _rotationTimeElapsed = 0;
-            }
+            _currentState._Process(delta);
         }
     }
 }
