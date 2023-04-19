@@ -1,0 +1,15 @@
+[remap]
+
+importer="ogg_vorbis"
+type="AudioStreamOGGVorbis"
+path="res://.import/sebec.ogg-d5616d170e8f4722c5ac6c1b60f52523.oggstr"
+
+[deps]
+
+source_file="res://assets/sound/bgm/sebec.ogg"
+dest_files=[ "res://.import/sebec.ogg-d5616d170e8f4722c5ac6c1b60f52523.oggstr" ]
+
+[params]
+
+loop=true
+loop_offset=0
