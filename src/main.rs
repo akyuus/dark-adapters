@@ -5,6 +5,11 @@ use bevy::prelude::*;
 use bevy_tweening::lens::{TransformPositionLens, TransformRotationLens};
 use bevy_tweening::{Animator, AnimatorState, EaseMethod, Tween, TweeningPlugin};
 
+use crate::model::cell::{spawn_dungeon_cell, DungeonCellBundle, TileBundle};
+use crate::model::tile::{BaseTileBundle, EmptyTileBundle};
+
+mod model;
+
 #[derive(Clone, Copy, PartialEq)]
 enum MovementState {
     STATIONARY,
@@ -34,76 +39,41 @@ fn setup(
     asset_server: Res<AssetServer>,
     mut meshes: ResMut<Assets<Mesh>>,
     mut materials: ResMut<Assets<StandardMaterial>>,
-    _images: ResMut<Assets<Image>>,
 ) {
     // load a texture and retrieve its aspect ratio
-    let wall_handle = asset_server.load("img/dun/wall1.png");
-    let floor_handle = asset_server.load("img/dun/floor.png");
-    let ceiling_handle = asset_server.load("img/dun/plainCeiling.png");
+    // let wall_handle = asset_server.load("img/dun/wall1.png");
+    // let floor_handle = asset_server.load("img/dun/floor.png");
+    // let ceiling_handle = asset_server.load("img/dun/plainCeiling.png");
 
-    let aspect = 1.0;
-    // create a new quad mesh. this is what we will apply the texture to
-    let quad_width = 2.0;
-    let quad_handle = meshes.add(Mesh::from(shape::Quad::new(Vec2::new(
-        quad_width,
-        quad_width * aspect,
-    ))));
+    let wall_tile = BaseTileBundle::new(
+        &asset_server,
+        &mut meshes,
+        &mut materials,
+        "img/dun/wall1.png",
+    );
+    let floor_tile = BaseTileBundle::new(
+        &asset_server,
+        &mut meshes,
+        &mut materials,
+        "img/dun/floor.png",
+    );
+    let ceiling_tile = BaseTileBundle::new(
+        &asset_server,
+        &mut meshes,
+        &mut materials,
+        "img/dun/plainCeiling.png",
+    );
 
-    // this material renders the texture normally
-    let wall_material = materials.add(StandardMaterial {
-        base_color_texture: Some(wall_handle),
-        alpha_mode: AlphaMode::Blend,
-        unlit: true,
-        ..default()
-    });
-    let floor_material = materials.add(StandardMaterial {
-        base_color_texture: Some(floor_handle),
-        alpha_mode: AlphaMode::Blend,
-        unlit: true,
-        ..default()
-    });
-    let ceiling_material = materials.add(StandardMaterial {
-        base_color_texture: Some(ceiling_handle),
-        alpha_mode: AlphaMode::Blend,
-        unlit: true,
-        ..default()
-    });
-
-    // textured quad - normal
-    commands.spawn(PbrBundle {
-        mesh: quad_handle.clone(),
-        material: wall_material.clone(),
-        transform: Transform::from_xyz(0.0, 1.0, -2.0),
-        ..default()
-    });
-    commands.spawn(PbrBundle {
-        mesh: quad_handle.clone(),
-        material: wall_material.clone(),
-        transform: Transform::from_xyz(-1.0, 1.0, -1.0)
-            .with_rotation(Quat::from_rotation_y(PI / 2.0)),
-        ..default()
-    });
-    commands.spawn(PbrBundle {
-        mesh: quad_handle.clone(),
-        material: wall_material,
-        transform: Transform::from_xyz(1.0, 1.0, -1.0)
-            .with_rotation(Quat::from_rotation_y(-PI / 2.0)),
-        ..default()
-    });
-    commands.spawn(PbrBundle {
-        mesh: quad_handle.clone(),
-        material: floor_material,
-        transform: Transform::from_xyz(0.0, 0.0, -1.0)
-            .with_rotation(Quat::from_rotation_x(-PI / 2.0)),
-        ..default()
-    });
-    commands.spawn(PbrBundle {
-        mesh: quad_handle,
-        material: ceiling_material,
-        transform: Transform::from_xyz(0.0, 2.0, -1.0)
-            .with_rotation(Quat::from_rotation_x(PI / 2.0)),
-        ..default()
-    });
+    let test_cell = DungeonCellBundle::new(Transform::from_xyz(0.0, 0.0, 0.0));
+    let tile_bundle = TileBundle::new(
+        wall_tile.clone(),
+        wall_tile.clone(),
+        EmptyTileBundle::new(),
+        wall_tile,
+        ceiling_tile,
+        floor_tile,
+    );
+    spawn_dungeon_cell(test_cell, tile_bundle, &mut commands);
 
     // player
     commands.spawn((
@@ -187,6 +157,5 @@ fn move_player(mut query: Query<(&mut Player, &mut Animator<Transform>)>) {
     {
         player.movement_state = MovementState::STATIONARY;
         animator.state = AnimatorState::Paused;
-        println!("stopped");
     }
 }
