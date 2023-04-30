@@ -6,7 +6,7 @@ use bevy_tweening::lens::{TransformPositionLens, TransformRotationLens};
 use bevy_tweening::{Animator, AnimatorState, EaseMethod, Tween, TweeningPlugin};
 
 use crate::model::cell::{spawn_dungeon_cell, DungeonCellBundle, TileBundle};
-use crate::model::tile::{BaseTileBundle, EmptyTileBundle};
+use crate::model::tile::{load_handles, PurpleTexture, Tile};
 
 mod model;
 
@@ -27,6 +27,7 @@ fn main() {
         .insert_resource(Msaa::Off)
         .add_plugins(DefaultPlugins.set(ImagePlugin::default_nearest()))
         .add_plugin(TweeningPlugin)
+        .add_startup_system(load_handles)
         .add_startup_system(setup)
         .add_system(keyboard_input_system)
         .add_system(move_player.before(keyboard_input_system))
@@ -34,42 +35,17 @@ fn main() {
 }
 
 /// sets up a scene with textured entities
-fn setup(
-    mut commands: Commands,
-    asset_server: Res<AssetServer>,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-) {
-    // load a texture and retrieve its aspect ratio
-    // let wall_handle = asset_server.load("img/dun/wall1.png");
-    // let floor_handle = asset_server.load("img/dun/floor.png");
-    // let ceiling_handle = asset_server.load("img/dun/plainCeiling.png");
-
-    let wall_tile = BaseTileBundle::new(
-        &asset_server,
-        &mut meshes,
-        &mut materials,
-        "img/dun/wall1.png",
-    );
-    let floor_tile = BaseTileBundle::new(
-        &asset_server,
-        &mut meshes,
-        &mut materials,
-        "img/dun/floor.png",
-    );
-    let ceiling_tile = BaseTileBundle::new(
-        &asset_server,
-        &mut meshes,
-        &mut materials,
-        "img/dun/plainCeiling.png",
-    );
+fn setup(mut commands: Commands) {
+    let wall_tile = Tile::from_texture_enum(PurpleTexture::Wall);
+    let floor_tile = Tile::from_texture_enum(PurpleTexture::Floor);
+    let ceiling_tile = Tile::from_texture_enum(PurpleTexture::Ceiling);
 
     let test_cell = DungeonCellBundle::new(Transform::from_xyz(0.0, 0.0, 0.0));
     let tile_bundle = TileBundle::new(
         wall_tile.clone(),
         wall_tile.clone(),
-        EmptyTileBundle::new(),
         wall_tile,
+        Tile::new_empty(),
         ceiling_tile,
         floor_tile,
     );

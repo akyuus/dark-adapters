@@ -1,7 +1,7 @@
+use crate::model::tile::Tile;
+use bevy::math::Vec3;
 use bevy::prelude::{BuildChildren, Bundle, Commands, Component, Quat, SpatialBundle, Transform};
 use std::f32::consts::PI;
-
-use crate::model::tile::Tile;
 
 pub enum TileDirection {
     LEFT,
@@ -14,24 +14,21 @@ pub enum TileDirection {
 
 impl TileDirection {
     fn get_tile_transform(direction: TileDirection) -> Transform {
+        // these tiny offsets are here to prevent z-fighting
         match direction {
-            TileDirection::LEFT => {
-                Transform::from_xyz(-1.0, 1.0, -1.0).with_rotation(Quat::from_rotation_y(PI / 2.0))
-            }
-            TileDirection::FORWARD => Transform::from_xyz(0.0, 1.0, -2.0),
-            TileDirection::RIGHT => {
-                Transform::from_xyz(1.0, 1.0, -1.0).with_rotation(Quat::from_rotation_y(-PI / 2.0))
-            }
-            TileDirection::BACK => Transform::from_xyz(0.0, 1.0, 0.0),
-            TileDirection::TOP => {
-                Transform::from_xyz(0.0, 2.0, -1.0).with_rotation(Quat::from_rotation_x(PI / 2.0))
-            }
-            TileDirection::BOTTOM => {
-                Transform::from_xyz(0.0, 0.0, -1.0).with_rotation(Quat::from_rotation_x(-PI / 2.0))
-            }
+            TileDirection::LEFT => Transform::from_xyz(-1.0000001, 1.0, -1.0)
+                .with_rotation(Quat::from_rotation_y(PI / 2.0)),
+            TileDirection::FORWARD => Transform::from_xyz(0.0, 1.0, -2.0000001),
+            TileDirection::RIGHT => Transform::from_xyz(1.0000001, 1.0, -1.0)
+                .with_rotation(Quat::from_rotation_y(-PI / 2.0)),
+            TileDirection::BACK => Transform::from_xyz(0.0, 1.0, 0.0000001),
+            TileDirection::TOP => Transform::from_xyz(0.0, 2.00000001, -1.0)
+                .with_rotation(Quat::from_rotation_x(PI / 2.0)),
+            TileDirection::BOTTOM => Transform::from_xyz(0.0, -0.00000001, -1.0)
+                .with_rotation(Quat::from_rotation_x(-PI / 2.0)),
         }
     }
-    fn set_tile_transform<T: Tile>(tile: &mut T, transform: Transform) {
+    fn set_tile_transform(tile: &mut Tile, transform: Transform) {
         tile.set_tile_transform(transform);
     }
 }
@@ -56,44 +53,29 @@ impl DungeonCellBundle {
 }
 
 #[derive(Bundle)]
-pub struct TileBundle<
-    T1: Tile + Bundle,
-    T2: Tile + Bundle,
-    T3: Tile + Bundle,
-    T4: Tile + Bundle,
-    T5: Tile + Bundle,
-    T6: Tile + Bundle,
-> {
+pub struct TileBundle {
     #[bundle]
-    left: T1,
+    left: Tile,
     #[bundle]
-    forward: T2,
+    forward: Tile,
     #[bundle]
-    right: T3,
+    right: Tile,
     #[bundle]
-    back: T4,
+    back: Tile,
     #[bundle]
-    top: T5,
+    top: Tile,
     #[bundle]
-    bottom: T6,
+    bottom: Tile,
 }
 
-impl<
-        T1: Tile + Bundle,
-        T2: Tile + Bundle,
-        T3: Tile + Bundle,
-        T4: Tile + Bundle,
-        T5: Tile + Bundle,
-        T6: Tile + Bundle,
-    > TileBundle<T1, T2, T3, T4, T5, T6>
-{
+impl TileBundle {
     pub fn new(
-        mut left: T1,
-        mut forward: T2,
-        mut right: T3,
-        mut back: T4,
-        mut top: T5,
-        mut bottom: T6,
+        mut left: Tile,
+        mut forward: Tile,
+        mut right: Tile,
+        mut back: Tile,
+        mut top: Tile,
+        mut bottom: Tile,
     ) -> Self {
         TileDirection::set_tile_transform(
             &mut left,
@@ -131,16 +113,9 @@ impl<
     }
 }
 
-pub fn spawn_dungeon_cell<
-    T1: Tile + Bundle,
-    T2: Tile + Bundle,
-    T3: Tile + Bundle,
-    T4: Tile + Bundle,
-    T5: Tile + Bundle,
-    T6: Tile + Bundle,
->(
+pub fn spawn_dungeon_cell(
     cell_bundle: DungeonCellBundle,
-    tile_bundle: TileBundle<T1, T2, T3, T4, T5, T6>,
+    tile_bundle: TileBundle,
     commands: &mut Commands,
 ) {
     let left = commands.spawn(tile_bundle.left).id();
