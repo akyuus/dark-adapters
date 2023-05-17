@@ -2,19 +2,29 @@ use std::f32::consts::PI;
 use std::time::Duration;
 
 use bevy::prelude::*;
+use bevy_rapier3d::geometry::{Collider, CollisionGroups, Group};
+use bevy_rapier3d::plugin::RapierContext;
+use bevy_rapier3d::prelude::{ActiveCollisionTypes, NoUserData, QueryFilter, RapierPhysicsPlugin};
 use bevy_tweening::lens::{TransformPositionLens, TransformRotationLens};
-use bevy_tweening::{Animator, AnimatorState, EaseMethod, Tween, TweeningPlugin};
+use bevy_tweening::{
+    Animator, AnimatorState, EaseMethod, RepeatCount, RepeatStrategy, Tween, TweeningPlugin,
+};
 
-use crate::model::cell::{spawn_dungeon_cell, DungeonCellBundle, TileBundle};
-use crate::model::tile::{load_handles, PurpleTexture, Tile};
+use crate::model::cell::{
+    spawn_dungeon_cell, DungeonCell, DungeonCellType, GridPosition, TileBundle, TileBundlePreset,
+};
+use crate::model::grid::{spawn_grid, DungeonGrid, DungeonGridBundle};
+use crate::model::tile::{
+    load_handles, PurpleTexture, Tile, BASIC_COLLISION_GROUP, BASIC_TILE_GROUP,
+};
 
 mod model;
 
 #[derive(Clone, Copy, PartialEq)]
 enum MovementState {
-    STATIONARY,
-    WALKING,
-    ROTATING,
+    Stationary,
+    Walking,
+    Rotating,
 }
 
 #[derive(Component)]
@@ -22,71 +32,93 @@ struct Player {
     movement_state: MovementState,
 }
 
+struct TranslatePlayerEvent(Entity);
+
 fn main() {
     App::new()
         .insert_resource(Msaa::Off)
         .add_plugins(DefaultPlugins.set(ImagePlugin::default_nearest()))
+        .add_plugin(RapierPhysicsPlugin::<NoUserData>::default())
         .add_plugin(TweeningPlugin)
+        .add_event::<TranslatePlayerEvent>()
         .add_startup_system(load_handles)
-        .add_startup_system(setup)
-        .add_system(keyboard_input_system)
-        .add_system(move_player.before(keyboard_input_system))
+        .add_startup_system(setup.after(load_handles))
+        .add_system(try_move_player)
         .run();
 }
 
-/// sets up a scene with textured entities
 fn setup(mut commands: Commands) {
-    let wall_tile = Tile::from_texture_enum(PurpleTexture::Wall);
-    let floor_tile = Tile::from_texture_enum(PurpleTexture::Floor);
-    let ceiling_tile = Tile::from_texture_enum(PurpleTexture::Ceiling);
-
-    let test_cell = DungeonCellBundle::new(Transform::from_xyz(0.0, 0.0, 0.0));
-    let tile_bundle = TileBundle::new(
-        wall_tile.clone(),
-        wall_tile.clone(),
-        wall_tile,
-        Tile::new_empty(),
-        ceiling_tile,
-        floor_tile,
-    );
-    spawn_dungeon_cell(test_cell, tile_bundle, &mut commands);
+    let row = vec![
+        DungeonCell::from_preset(TileBundlePreset::WestHallwayEnd),
+        DungeonCell::from_preset(TileBundlePreset::EastWestHallway),
+        DungeonCell::from_preset(TileBundlePreset::EastHallwayEnd),
+    ];
+    let grid = vec![row];
+    spawn_grid(grid, &mut commands);
 
     // player
-    commands.spawn((
-        Player {
-            movement_state: MovementState::STATIONARY,
-        },
-        Animator::new(Tween::new(
-            EaseMethod::Linear,
-            Duration::from_secs(1),
-            TransformPositionLens {
-                start: Vec3::ZERO,
-                end: Vec3::new(1., 2., -4.),
+    // TODO: bundle this
+    commands
+        .spawn((
+            Player {
+                movement_state: MovementState::Stationary,
             },
+            Animator::new(Tween::new(
+                EaseMethod::Linear,
+                Duration::from_secs(1),
+                TransformPositionLens {
+                    start: Vec3::ZERO,
+                    end: Vec3::new(1., 2., -4.),
+                },
+            ))
+            .with_state(AnimatorState::Paused),
+            Camera3dBundle {
+                transform: Transform::from_xyz(0.0, 1.0, 1.0)
+                    .looking_at(Vec3::new(2.0, 1.0, 1.0), Vec3::Y),
+                ..default()
+            },
+            Collider::ball(f32::EPSILON),
+            GridPosition { row: 0, col: 0 },
         ))
-        .with_state(AnimatorState::Paused),
-        Camera3dBundle {
-            transform: Transform::from_xyz(0.0, 1.0, 2.0)
-                .looking_at(Vec3::new(0.0, 1.0, -1.0), Vec3::Y),
-            ..default()
-        },
-    ));
+        .insert(CollisionGroups::new(Group::GROUP_1, Group::GROUP_2));
 }
 
-fn keyboard_input_system(
+fn try_move_player(
     keyboard_input: Res<Input<KeyCode>>,
-    mut query: Query<(&mut Player, &mut Transform, &mut Animator<Transform>), With<Camera>>,
+    mut player_query: Query<
+        (
+            Entity,
+            &mut Player,
+            &mut Transform,
+            &mut Animator<Transform>,
+            &mut GridPosition,
+        ),
+        With<Camera>,
+    >,
+    mut grid_query: Query<&mut DungeonGrid>,
 ) {
-    let (mut player, transform, mut animator) = query.single_mut();
+    let (id, mut player, transform, mut animator, mut grid_pos) = player_query.single_mut();
+    let mut dungeon_grid = grid_query.single_mut();
+    // animation over?
+    if animator.tweenable().duration().as_secs_f32() - animator.tweenable().elapsed().as_secs_f32()
+        < f32::EPSILON
+        && animator.state == AnimatorState::Playing
+        && player.movement_state != MovementState::Stationary
+    {
+        player.movement_state = MovementState::Stationary;
+        animator.state = AnimatorState::Paused;
+    }
 
-    if player.movement_state != MovementState::STATIONARY {
+    // player moving?
+    if player.movement_state != MovementState::Stationary {
         return;
     }
 
     let mut translate_diff = Vec3::ZERO;
     let mut rotate_diff = 0_f32;
-    let mut movement_state = MovementState::STATIONARY;
+    let mut movement_state = MovementState::Stationary;
 
+    //region keyboard input
     if keyboard_input.just_pressed(KeyCode::Up) {
         translate_diff = transform.forward();
     } else if keyboard_input.just_pressed(KeyCode::Down) {
@@ -96,19 +128,39 @@ fn keyboard_input_system(
     } else if keyboard_input.just_pressed(KeyCode::Right) {
         rotate_diff = -PI / 2.0;
     }
+    //endregion
 
     if translate_diff.length_squared() > f32::EPSILON {
-        movement_state = MovementState::WALKING;
-        animator.set_tweenable(Tween::new(
-            EaseMethod::Linear,
-            Duration::from_secs_f32(0.3),
-            TransformPositionLens {
-                start: transform.translation,
-                end: transform.translation + translate_diff,
-            },
-        ));
+        // check for collision here
+        let (new_pos, collision_occurred) = dungeon_grid.check_collision(&grid_pos, translate_diff);
+        if !collision_occurred {
+            movement_state = MovementState::Walking;
+            animator.set_tweenable(Tween::new(
+                EaseMethod::Linear,
+                Duration::from_secs_f32(0.3),
+                TransformPositionLens {
+                    start: transform.translation,
+                    end: transform.translation + translate_diff,
+                },
+            ));
+            grid_pos.col = new_pos.col;
+            grid_pos.row = new_pos.row;
+        } else {
+            // hitting wall
+            let start = transform.translation;
+            let end = transform.translation + 0.3 * translate_diff;
+            let collision_tween = Tween::new(
+                EaseMethod::Linear,
+                Duration::from_secs_f32(0.1),
+                TransformPositionLens { start, end },
+            )
+            .with_repeat_count(2)
+            .with_repeat_strategy(RepeatStrategy::MirroredRepeat);
+            animator.set_tweenable(collision_tween);
+            animator.state = AnimatorState::Playing;
+        }
     } else if rotate_diff.abs() > f32::EPSILON {
-        movement_state = MovementState::ROTATING;
+        movement_state = MovementState::Rotating;
         animator.set_tweenable(Tween::new(
             EaseMethod::Linear,
             Duration::from_secs_f32(0.3),
@@ -117,21 +169,11 @@ fn keyboard_input_system(
                 end: transform.rotation * Quat::from_rotation_y(rotate_diff),
             },
         ));
-        // transform.rotate_local_y(rotate_diff); // <-- works
     }
     player.movement_state = movement_state;
-}
 
-fn move_player(mut query: Query<(&mut Player, &mut Animator<Transform>)>) {
-    let (mut player, mut animator) = query.single_mut();
-    if player.movement_state != MovementState::STATIONARY {
+    // play animation
+    if player.movement_state != MovementState::Stationary {
         animator.state = AnimatorState::Playing;
-    }
-    if animator.tweenable().duration().as_secs_f32() - animator.tweenable().elapsed().as_secs_f32()
-        < f32::EPSILON
-        && animator.state == AnimatorState::Playing
-    {
-        player.movement_state = MovementState::STATIONARY;
-        animator.state = AnimatorState::Paused;
     }
 }
