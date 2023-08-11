@@ -1,9 +1,7 @@
 use std::f32::consts::PI;
-use std::rc::Rc;
-use std::sync::{Arc, Mutex};
 
 use bevy::prelude::{
-    BuildChildren, Bundle, Commands, Component, Entity, Quat, SpatialBundle, Transform, Vec3,
+    BuildChildren, Bundle, Commands, Component, Quat, SpatialBundle, Transform, Vec3,
 };
 use bevy::utils::HashMap;
 use lazy_static::lazy_static;
@@ -12,21 +10,22 @@ use crate::model::tile::{PurpleTexture, Tile};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum TileBundlePreset {
+    Empty,
     Open,
-    NorthWall,
-    EastWall,
-    SouthWall,
-    WestWall,
-    NorthWestCorner,
-    NorthEastCorner,
-    SouthEastCorner,
-    SouthWestCorner,
-    NorthSouthHallway,
-    EastWestHallway,
-    NorthHallwayEnd,
-    EastHallwayEnd,
-    SouthHallwayEnd,
-    WestHallwayEnd,
+    ForwardWall,
+    RightWall,
+    BackWall,
+    LeftWall,
+    ForwardLeftCorner,
+    ForwardRightCorner,
+    BackRightCorner,
+    BackLeftCorner,
+    ForwardBackHallway,
+    LeftRightHallway,
+    ForwardHallwayEnd,
+    RightHallwayEnd,
+    BackHallwayEnd,
+    LeftHallwayEnd,
 }
 
 lazy_static! {
@@ -41,6 +40,14 @@ lazy_static! {
             Tile::new_empty(),
             ceiling_tile.clone(),
             floor_tile.clone(),
+        );
+        let empty = TileBundle::new(
+            Tile::new_empty(),
+            Tile::new_empty(),
+            Tile::new_empty(),
+            Tile::new_empty(),
+            Tile::new_empty(),
+            Tile::new_empty(),
         );
         let north_wall = TileBundle::new(
             Tile::new_empty(),
@@ -156,48 +163,49 @@ lazy_static! {
         );
         let mut m = HashMap::new();
         m.insert(TileBundlePreset::Open, open);
-        m.insert(TileBundlePreset::NorthWall, north_wall);
-        m.insert(TileBundlePreset::EastWall, east_wall);
-        m.insert(TileBundlePreset::SouthWall, south_wall);
-        m.insert(TileBundlePreset::WestWall, west_wall);
-        m.insert(TileBundlePreset::NorthWestCorner, north_west_corner);
-        m.insert(TileBundlePreset::NorthEastCorner, north_east_corner);
-        m.insert(TileBundlePreset::SouthEastCorner, south_east_corner);
-        m.insert(TileBundlePreset::SouthWestCorner, south_west_corner);
-        m.insert(TileBundlePreset::NorthSouthHallway, north_south_hallway);
-        m.insert(TileBundlePreset::EastWestHallway, east_west_hallway);
-        m.insert(TileBundlePreset::NorthHallwayEnd, north_hallway_end);
-        m.insert(TileBundlePreset::EastHallwayEnd, east_hallway_end);
-        m.insert(TileBundlePreset::SouthHallwayEnd, south_hallway_end);
-        m.insert(TileBundlePreset::WestHallwayEnd, west_hallway_end);
+        m.insert(TileBundlePreset::Empty, empty);
+        m.insert(TileBundlePreset::ForwardWall, north_wall);
+        m.insert(TileBundlePreset::RightWall, east_wall);
+        m.insert(TileBundlePreset::BackWall, south_wall);
+        m.insert(TileBundlePreset::LeftWall, west_wall);
+        m.insert(TileBundlePreset::ForwardLeftCorner, north_west_corner);
+        m.insert(TileBundlePreset::ForwardRightCorner, north_east_corner);
+        m.insert(TileBundlePreset::BackRightCorner, south_east_corner);
+        m.insert(TileBundlePreset::BackLeftCorner, south_west_corner);
+        m.insert(TileBundlePreset::ForwardBackHallway, north_south_hallway);
+        m.insert(TileBundlePreset::LeftRightHallway, east_west_hallway);
+        m.insert(TileBundlePreset::ForwardHallwayEnd, north_hallway_end);
+        m.insert(TileBundlePreset::RightHallwayEnd, east_hallway_end);
+        m.insert(TileBundlePreset::BackHallwayEnd, south_hallway_end);
+        m.insert(TileBundlePreset::LeftHallwayEnd, west_hallway_end);
         m
     };
 }
 
 pub enum TileDirection {
-    LEFT,
-    FORWARD,
-    RIGHT,
-    BACK,
-    TOP,
-    BOTTOM,
+    Left,
+    Forward,
+    Right,
+    Back,
+    Top,
+    Bottom,
 }
 
 impl TileDirection {
     fn get_tile_transform(direction: TileDirection) -> Transform {
         // these tiny offsets are here to prevent z-fighting
         match direction {
-            TileDirection::LEFT => Transform::from_xyz(-0.5000001, 1.0, 0.0)
+            TileDirection::Left => Transform::from_xyz(-0.5000001, 1.0, 0.0)
                 .with_rotation(Quat::from_rotation_y(-PI / 2.0)),
-            TileDirection::FORWARD => {
+            TileDirection::Forward => {
                 Transform::from_xyz(0.0, 1.0, -0.5000001).with_rotation(Quat::from_rotation_z(PI))
             }
-            TileDirection::RIGHT => Transform::from_xyz(0.5000001, 1.0, 0.0)
+            TileDirection::Right => Transform::from_xyz(0.5000001, 1.0, 0.0)
                 .with_rotation(Quat::from_rotation_y(PI / 2.0)),
-            TileDirection::BACK => Transform::from_xyz(0.0, 1.0, 0.5000001),
-            TileDirection::TOP => Transform::from_xyz(0.0, 1.5000001, 0.0)
+            TileDirection::Back => Transform::from_xyz(0.0, 1.0, 0.5000001),
+            TileDirection::Top => Transform::from_xyz(0.0, 1.5000001, 0.0)
                 .with_rotation(Quat::from_rotation_x(PI / 2.0)),
-            TileDirection::BOTTOM => Transform::from_xyz(0.0, 0.5000001, 0.0)
+            TileDirection::Bottom => Transform::from_xyz(0.0, 0.5000001, 0.0)
                 .with_rotation(Quat::from_rotation_x(-PI / 2.0)),
         }
     }
@@ -220,9 +228,7 @@ pub struct GridPosition {
 #[derive(Bundle)]
 pub struct DungeonCell {
     pub cell_type: DungeonCellType,
-    #[bundle]
     spatial_bundle: SpatialBundle,
-    #[bundle]
     pub tile_bundle: TileBundle,
     pub grid_position: GridPosition,
 }
@@ -256,17 +262,11 @@ impl Clone for DungeonCell {
 
 #[derive(Bundle, Clone)]
 pub struct TileBundle {
-    #[bundle]
     pub left: Tile,
-    #[bundle]
     pub forward: Tile,
-    #[bundle]
     pub right: Tile,
-    #[bundle]
     pub back: Tile,
-    #[bundle]
     pub top: Tile,
-    #[bundle]
     pub bottom: Tile,
 }
 
@@ -281,27 +281,27 @@ impl TileBundle {
     ) -> Self {
         TileDirection::set_tile_transform(
             &mut left,
-            TileDirection::get_tile_transform(TileDirection::LEFT),
+            TileDirection::get_tile_transform(TileDirection::Left),
         );
         TileDirection::set_tile_transform(
             &mut forward,
-            TileDirection::get_tile_transform(TileDirection::FORWARD),
+            TileDirection::get_tile_transform(TileDirection::Forward),
         );
         TileDirection::set_tile_transform(
             &mut right,
-            TileDirection::get_tile_transform(TileDirection::RIGHT),
+            TileDirection::get_tile_transform(TileDirection::Right),
         );
         TileDirection::set_tile_transform(
             &mut back,
-            TileDirection::get_tile_transform(TileDirection::BACK),
+            TileDirection::get_tile_transform(TileDirection::Back),
         );
         TileDirection::set_tile_transform(
             &mut top,
-            TileDirection::get_tile_transform(TileDirection::TOP),
+            TileDirection::get_tile_transform(TileDirection::Top),
         );
         TileDirection::set_tile_transform(
             &mut bottom,
-            TileDirection::get_tile_transform(TileDirection::BOTTOM),
+            TileDirection::get_tile_transform(TileDirection::Bottom),
         );
 
         TileBundle {

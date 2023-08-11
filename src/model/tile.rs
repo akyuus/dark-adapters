@@ -1,15 +1,11 @@
+use std::f32::consts::PI;
+use std::sync::Mutex;
+
 use bevy::prelude::*;
 use bevy::utils::HashMap;
 use lazy_static::lazy_static;
-use std::f32::consts::PI;
-
-use bevy_rapier3d::geometry::{ActiveCollisionTypes, Collider, CollisionGroups, Group};
-use bevy_rapier3d::prelude::RigidBody;
-use std::sync::Mutex;
 
 const QUAD_WIDTH: f32 = 1.0;
-pub const BASIC_TILE_GROUP: Group = Group::GROUP_2;
-pub const EMPTY_TILE_GROUP: Group = Group::GROUP_3;
 
 #[derive(Hash, PartialEq, Eq, Copy, Clone, Debug)]
 pub enum PurpleTexture {
@@ -31,10 +27,6 @@ lazy_static! {
         Mutex::new(HashMap::new());
     static ref PURPLE_MATERIALS: Mutex<HashMap<PurpleTexture, Handle<StandardMaterial>>> =
         Mutex::new(HashMap::new());
-    pub static ref BASIC_COLLISION_GROUP: CollisionGroups =
-        CollisionGroups::new(BASIC_TILE_GROUP, Group::GROUP_1);
-    static ref EMPTY_COLLISION_GROUP: CollisionGroups =
-        CollisionGroups::new(EMPTY_TILE_GROUP, Group::NONE);
 }
 
 #[derive(Component, PartialEq, Clone, Debug)]
@@ -46,12 +38,7 @@ pub enum TileType {
 #[derive(Bundle, Clone)]
 pub struct Tile {
     pub tile_type: TileType,
-    collider: Collider,
-    collision_groups: CollisionGroups,
-    active_collision_types: ActiveCollisionTypes,
-    #[bundle]
     pbr_bundle: PbrBundle,
-    rigid_body: RigidBody,
 }
 
 pub fn load_handles(
@@ -86,34 +73,6 @@ pub fn load_handles(
 }
 
 impl Tile {
-    pub fn new(
-        asset_server: &Res<AssetServer>,
-        materials: &mut ResMut<Assets<StandardMaterial>>,
-        texture_path: &str,
-    ) -> Self {
-        let image_handle = asset_server.load(texture_path);
-        let material_handle = materials.add(StandardMaterial {
-            base_color_texture: Some(image_handle),
-            alpha_mode: AlphaMode::Blend,
-            unlit: true,
-            ..default()
-        });
-        let pbr_bundle = PbrBundle {
-            mesh: TILE_MESH.lock().unwrap().clone(),
-            material: material_handle,
-            transform: Transform::from_xyz(0.0, 0.0, 0.0)
-                .with_rotation(Quat::from_rotation_x(-PI / 2.0)),
-            ..default()
-        };
-        Tile {
-            tile_type: TileType::Basic,
-            pbr_bundle,
-            collider: Collider::cuboid(QUAD_WIDTH, QUAD_WIDTH, f32::EPSILON),
-            collision_groups: BASIC_COLLISION_GROUP.clone(),
-            ..default()
-        }
-    }
-
     pub fn from_texture_enum(purple_texture: PurpleTexture) -> Self {
         Tile {
             tile_type: TileType::Basic,
@@ -129,10 +88,6 @@ impl Tile {
                     .with_rotation(Quat::from_rotation_x(-PI / 2.0)),
                 ..default()
             },
-            collider: Collider::cuboid(QUAD_WIDTH, QUAD_WIDTH, 0.01),
-            collision_groups: BASIC_COLLISION_GROUP.clone(),
-            active_collision_types: ActiveCollisionTypes::empty(),
-            rigid_body: RigidBody::Fixed,
         }
     }
 
@@ -140,13 +95,7 @@ impl Tile {
         Tile {
             tile_type: TileType::Empty,
             pbr_bundle: PbrBundle::default(),
-            collider: Collider::cuboid(QUAD_WIDTH, QUAD_WIDTH, f32::EPSILON),
-            collision_groups: EMPTY_COLLISION_GROUP.clone(),
-            ..default()
         }
-    }
-    pub fn transform(&mut self) -> &mut Transform {
-        &mut self.pbr_bundle.transform as _
     }
 
     pub fn set_tile_transform(&mut self, transform: Transform) {
@@ -170,10 +119,6 @@ impl Default for Tile {
                     .with_rotation(Quat::from_rotation_x(-PI / 2.0)),
                 ..default()
             },
-            collider: Collider::cuboid(QUAD_WIDTH, QUAD_WIDTH, f32::EPSILON),
-            collision_groups: BASIC_COLLISION_GROUP.clone(),
-            active_collision_types: ActiveCollisionTypes::empty(),
-            rigid_body: RigidBody::Fixed,
         }
     }
 }

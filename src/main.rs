@@ -1,22 +1,14 @@
 use std::f32::consts::PI;
+use std::fs;
 use std::time::Duration;
 
 use bevy::prelude::*;
-use bevy_rapier3d::geometry::{Collider, CollisionGroups, Group};
-use bevy_rapier3d::plugin::RapierContext;
-use bevy_rapier3d::prelude::{ActiveCollisionTypes, NoUserData, QueryFilter, RapierPhysicsPlugin};
 use bevy_tweening::lens::{TransformPositionLens, TransformRotationLens};
-use bevy_tweening::{
-    Animator, AnimatorState, EaseMethod, RepeatCount, RepeatStrategy, Tween, TweeningPlugin,
-};
+use bevy_tweening::{Animator, AnimatorState, EaseMethod, RepeatStrategy, Tween, TweeningPlugin};
 
-use crate::model::cell::{
-    spawn_dungeon_cell, DungeonCell, DungeonCellType, GridPosition, TileBundle, TileBundlePreset,
-};
-use crate::model::grid::{spawn_grid, DungeonGrid, DungeonGridBundle};
-use crate::model::tile::{
-    load_handles, PurpleTexture, Tile, BASIC_COLLISION_GROUP, BASIC_TILE_GROUP,
-};
+use crate::model::cell::GridPosition;
+use crate::model::grid::{spawn_grid, DungeonGrid, RawDungeonGrid};
+use crate::model::tile::load_handles;
 
 mod model;
 
@@ -32,55 +24,48 @@ struct Player {
     movement_state: MovementState,
 }
 
-struct TranslatePlayerEvent(Entity);
+// struct TranslatePlayerEvent(Entity);
 
 fn main() {
     App::new()
         .insert_resource(Msaa::Off)
-        .add_plugins(DefaultPlugins.set(ImagePlugin::default_nearest()))
-        .add_plugin(RapierPhysicsPlugin::<NoUserData>::default())
-        .add_plugin(TweeningPlugin)
-        .add_event::<TranslatePlayerEvent>()
-        .add_startup_system(load_handles)
-        .add_startup_system(setup.after(load_handles))
-        .add_system(try_move_player)
+        .add_plugins((
+            DefaultPlugins.set(ImagePlugin::default_nearest()),
+            TweeningPlugin,
+        ))
+        .add_systems(Startup, (load_handles, setup.after(load_handles)))
+        .add_systems(Update, try_move_player)
         .run();
 }
 
 fn setup(mut commands: Commands) {
-    let row = vec![
-        DungeonCell::from_preset(TileBundlePreset::WestHallwayEnd),
-        DungeonCell::from_preset(TileBundlePreset::EastWestHallway),
-        DungeonCell::from_preset(TileBundlePreset::EastHallwayEnd),
-    ];
-    let grid = vec![row];
+    let dungeon_json: String = fs::read_to_string("assets/dungeon_data/dungeon.json").unwrap();
+    let raw_dungeon: RawDungeonGrid = serde_json::from_str(&dungeon_json).unwrap();
+    let grid = DungeonGrid::from_raw(raw_dungeon);
     spawn_grid(grid, &mut commands);
 
     // player
     // TODO: bundle this
-    commands
-        .spawn((
-            Player {
-                movement_state: MovementState::Stationary,
+    commands.spawn((
+        Player {
+            movement_state: MovementState::Stationary,
+        },
+        Animator::new(Tween::new(
+            EaseMethod::Linear,
+            Duration::from_secs(1),
+            TransformPositionLens {
+                start: Vec3::ZERO,
+                end: Vec3::new(1., 2., -4.),
             },
-            Animator::new(Tween::new(
-                EaseMethod::Linear,
-                Duration::from_secs(1),
-                TransformPositionLens {
-                    start: Vec3::ZERO,
-                    end: Vec3::new(1., 2., -4.),
-                },
-            ))
-            .with_state(AnimatorState::Paused),
-            Camera3dBundle {
-                transform: Transform::from_xyz(0.0, 1.0, 1.0)
-                    .looking_at(Vec3::new(2.0, 1.0, 1.0), Vec3::Y),
-                ..default()
-            },
-            Collider::ball(f32::EPSILON),
-            GridPosition { row: 0, col: 0 },
         ))
-        .insert(CollisionGroups::new(Group::GROUP_1, Group::GROUP_2));
+        .with_state(AnimatorState::Paused),
+        Camera3dBundle {
+            transform: Transform::from_xyz(0.0, 1.0, 1.0)
+                .looking_at(Vec3::new(2.0, 1.0, 1.0), Vec3::Y),
+            ..default()
+        },
+        GridPosition { row: 1, col: 0 },
+    ));
 }
 
 fn try_move_player(
@@ -97,7 +82,7 @@ fn try_move_player(
     >,
     mut grid_query: Query<&mut DungeonGrid>,
 ) {
-    let (id, mut player, transform, mut animator, mut grid_pos) = player_query.single_mut();
+    let (_id, mut player, transform, mut animator, mut grid_pos) = player_query.single_mut();
     let mut dungeon_grid = grid_query.single_mut();
     // animation over?
     if animator.tweenable().duration().as_secs_f32() - animator.tweenable().elapsed().as_secs_f32()
