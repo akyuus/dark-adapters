@@ -1,16 +1,24 @@
 use std::f32::consts::PI;
-use std::fs;
 use std::time::Duration;
 
+use crate::model::cell::{initialize_preset_map, GridPosition, TileBundlePresetMap};
+use crate::model::grid::{spawn_grid, DungeonAssets, DungeonGrid, RawDungeonData};
+use crate::model::tile::{PurpleTileAssets, PurpleTileTextureMap};
 use bevy::prelude::*;
+use bevy::window::close_on_esc;
+use bevy_asset_loader::prelude::{LoadingState, LoadingStateAppExt};
+use bevy_common_assets::json::JsonAssetPlugin;
 use bevy_tweening::lens::{TransformPositionLens, TransformRotationLens};
 use bevy_tweening::{Animator, AnimatorState, EaseMethod, RepeatStrategy, Tween, TweeningPlugin};
 
-use crate::model::cell::GridPosition;
-use crate::model::grid::{spawn_grid, DungeonGrid, RawDungeonGrid};
-use crate::model::tile::load_handles;
-
 mod model;
+
+#[derive(Debug, Clone, Copy, Default, Eq, PartialEq, Hash, States)]
+enum GameState {
+    #[default]
+    LoadingAssets,
+    Ready,
+}
 
 #[derive(Clone, Copy, PartialEq)]
 enum MovementState {
@@ -29,23 +37,51 @@ struct Player {
 fn main() {
     App::new()
         .insert_resource(Msaa::Off)
+        .add_state::<GameState>()
+        .add_loading_state(
+            LoadingState::new(GameState::LoadingAssets).continue_to_state(GameState::Ready),
+        )
+        .add_collection_to_loading_state::<_, PurpleTileAssets>(GameState::LoadingAssets)
+        .add_collection_to_loading_state::<_, DungeonAssets>(GameState::LoadingAssets)
+        .init_resource_after_loading_state::<_, PurpleTileTextureMap>(GameState::LoadingAssets)
+        .init_resource_after_loading_state::<_, TileBundlePresetMap>(GameState::LoadingAssets)
         .add_plugins((
             DefaultPlugins.set(ImagePlugin::default_nearest()),
             TweeningPlugin,
+            JsonAssetPlugin::<RawDungeonData>::new(&["dungeon.json"]),
         ))
-        .add_systems(Startup, (load_handles, setup.after(load_handles)))
-        .add_systems(Update, try_move_player)
+        .add_systems(
+            OnEnter(GameState::Ready),
+            (
+                initialize_preset_map
+                    .before(setup_player)
+                    .before(spawn_grid),
+                setup_player,
+                spawn_grid,
+            ),
+        )
+        .add_systems(
+            Update,
+            (try_move_player, close_on_esc).run_if(in_state(GameState::Ready)),
+        )
         .run();
 }
 
-fn setup(mut commands: Commands) {
-    let dungeon_json: String = fs::read_to_string("assets/dungeon_data/dungeon.json").unwrap();
-    let raw_dungeon: RawDungeonGrid = serde_json::from_str(&dungeon_json).unwrap();
-    let grid = DungeonGrid::from_raw(raw_dungeon);
-    spawn_grid(grid, &mut commands);
-
+fn setup_player(
+    mut commands: Commands,
+    raw_dungeon_data: Res<Assets<RawDungeonData>>,
+    dungeon_assets: Res<DungeonAssets>,
+) {
     // player
     // TODO: bundle this
+    let grid_pos: GridPosition = raw_dungeon_data
+        .get(&dungeon_assets.raw_dungeon_data)
+        .unwrap()
+        .player_start_position
+        .try_into()
+        .unwrap();
+    let player_pos = grid_pos.to_player_vec3();
+    let target = grid_pos.to_player_vec3() + 2.0 * Vec3::X;
     commands.spawn((
         Player {
             movement_state: MovementState::Stationary,
@@ -60,11 +96,10 @@ fn setup(mut commands: Commands) {
         ))
         .with_state(AnimatorState::Paused),
         Camera3dBundle {
-            transform: Transform::from_xyz(0.0, 1.0, 1.0)
-                .looking_at(Vec3::new(2.0, 1.0, 1.0), Vec3::Y),
+            transform: Transform::from_translation(player_pos).looking_at(target, Vec3::Y),
             ..default()
         },
-        GridPosition { row: 1, col: 0 },
+        grid_pos,
     ));
 }
 

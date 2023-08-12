@@ -1,12 +1,12 @@
 use std::f32::consts::PI;
 
 use bevy::prelude::{
-    BuildChildren, Bundle, Commands, Component, Quat, SpatialBundle, Transform, Vec3,
+    BuildChildren, Bundle, Commands, Component, Quat, ResMut, Resource, SpatialBundle, Transform,
+    Vec3,
 };
 use bevy::utils::HashMap;
-use lazy_static::lazy_static;
 
-use crate::model::tile::{PurpleTexture, Tile};
+use crate::model::tile::{PurpleTexture, PurpleTileTextureMap, Tile};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum TileBundlePreset {
@@ -28,158 +28,169 @@ pub enum TileBundlePreset {
     LeftHallwayEnd,
 }
 
-lazy_static! {
-    pub static ref TILE_BUNDLE_PRESET_MAP: HashMap<TileBundlePreset, TileBundle> = {
-        let wall_tile = Tile::from_texture_enum(PurpleTexture::Wall);
-        let floor_tile = Tile::from_texture_enum(PurpleTexture::Floor);
-        let ceiling_tile = Tile::from_texture_enum(PurpleTexture::Ceiling);
-        let open = TileBundle::new(
-            Tile::new_empty(),
-            Tile::new_empty(),
-            Tile::new_empty(),
-            Tile::new_empty(),
-            ceiling_tile.clone(),
-            floor_tile.clone(),
-        );
-        let empty = TileBundle::new(
-            Tile::new_empty(),
-            Tile::new_empty(),
-            Tile::new_empty(),
-            Tile::new_empty(),
-            Tile::new_empty(),
-            Tile::new_empty(),
-        );
-        let north_wall = TileBundle::new(
-            Tile::new_empty(),
-            wall_tile.clone(),
-            Tile::new_empty(),
-            Tile::new_empty(),
-            ceiling_tile.clone(),
-            floor_tile.clone(),
-        );
-        let east_wall = TileBundle::new(
-            Tile::new_empty(),
-            Tile::new_empty(),
-            wall_tile.clone(),
-            Tile::new_empty(),
-            ceiling_tile.clone(),
-            floor_tile.clone(),
-        );
-        let south_wall = TileBundle::new(
-            Tile::new_empty(),
-            Tile::new_empty(),
-            Tile::new_empty(),
-            wall_tile.clone(),
-            ceiling_tile.clone(),
-            floor_tile.clone(),
-        );
-        let west_wall = TileBundle::new(
-            wall_tile.clone(),
-            Tile::new_empty(),
-            Tile::new_empty(),
-            Tile::new_empty(),
-            ceiling_tile.clone(),
-            floor_tile.clone(),
-        );
-        let north_west_corner = TileBundle::new(
-            wall_tile.clone(),
-            wall_tile.clone(),
-            Tile::new_empty(),
-            Tile::new_empty(),
-            ceiling_tile.clone(),
-            floor_tile.clone(),
-        );
-        let north_east_corner = TileBundle::new(
-            Tile::new_empty(),
-            wall_tile.clone(),
-            wall_tile.clone(),
-            Tile::new_empty(),
-            ceiling_tile.clone(),
-            floor_tile.clone(),
-        );
-        let south_east_corner = TileBundle::new(
-            Tile::new_empty(),
-            Tile::new_empty(),
-            wall_tile.clone(),
-            wall_tile.clone(),
-            ceiling_tile.clone(),
-            floor_tile.clone(),
-        );
-        let south_west_corner = TileBundle::new(
-            wall_tile.clone(),
-            Tile::new_empty(),
-            Tile::new_empty(),
-            wall_tile.clone(),
-            ceiling_tile.clone(),
-            floor_tile.clone(),
-        );
-        let north_south_hallway = TileBundle::new(
-            wall_tile.clone(),
-            Tile::new_empty(),
-            wall_tile.clone(),
-            Tile::new_empty(),
-            ceiling_tile.clone(),
-            floor_tile.clone(),
-        );
-        let east_west_hallway = TileBundle::new(
-            Tile::new_empty(),
-            wall_tile.clone(),
-            Tile::new_empty(),
-            wall_tile.clone(),
-            ceiling_tile.clone(),
-            floor_tile.clone(),
-        );
-        let north_hallway_end = TileBundle::new(
-            wall_tile.clone(),
-            wall_tile.clone(),
-            wall_tile.clone(),
-            Tile::new_empty(),
-            ceiling_tile.clone(),
-            floor_tile.clone(),
-        );
-        let east_hallway_end = TileBundle::new(
-            Tile::new_empty(),
-            wall_tile.clone(),
-            wall_tile.clone(),
-            wall_tile.clone(),
-            ceiling_tile.clone(),
-            floor_tile.clone(),
-        );
-        let south_hallway_end = TileBundle::new(
-            wall_tile.clone(),
-            Tile::new_empty(),
-            wall_tile.clone(),
-            wall_tile.clone(),
-            ceiling_tile.clone(),
-            floor_tile.clone(),
-        );
-        let west_hallway_end = TileBundle::new(
-            wall_tile.clone(),
-            wall_tile.clone(),
-            Tile::new_empty(),
-            wall_tile.clone(),
-            ceiling_tile.clone(),
-            floor_tile.clone(),
-        );
-        let mut m = HashMap::new();
-        m.insert(TileBundlePreset::Open, open);
-        m.insert(TileBundlePreset::Empty, empty);
-        m.insert(TileBundlePreset::ForwardWall, north_wall);
-        m.insert(TileBundlePreset::RightWall, east_wall);
-        m.insert(TileBundlePreset::BackWall, south_wall);
-        m.insert(TileBundlePreset::LeftWall, west_wall);
-        m.insert(TileBundlePreset::ForwardLeftCorner, north_west_corner);
-        m.insert(TileBundlePreset::ForwardRightCorner, north_east_corner);
-        m.insert(TileBundlePreset::BackRightCorner, south_east_corner);
-        m.insert(TileBundlePreset::BackLeftCorner, south_west_corner);
-        m.insert(TileBundlePreset::ForwardBackHallway, north_south_hallway);
-        m.insert(TileBundlePreset::LeftRightHallway, east_west_hallway);
-        m.insert(TileBundlePreset::ForwardHallwayEnd, north_hallway_end);
-        m.insert(TileBundlePreset::RightHallwayEnd, east_hallway_end);
-        m.insert(TileBundlePreset::BackHallwayEnd, south_hallway_end);
-        m.insert(TileBundlePreset::LeftHallwayEnd, west_hallway_end);
-        m
-    };
+#[derive(Resource)]
+pub struct TileBundlePresetMap(pub HashMap<TileBundlePreset, TileBundle>);
+
+impl Default for TileBundlePresetMap {
+    fn default() -> Self {
+        TileBundlePresetMap(HashMap::new())
+    }
+}
+
+pub fn initialize_preset_map(
+    tile_texture_map: ResMut<PurpleTileTextureMap>,
+    mut tile_bundle_preset_map: ResMut<TileBundlePresetMap>,
+) {
+    let wall_tile = tile_texture_map.0.get(&PurpleTexture::Wall).unwrap();
+    let floor_tile = tile_texture_map.0.get(&PurpleTexture::Floor).unwrap();
+    let ceiling_tile = tile_texture_map.0.get(&PurpleTexture::Ceiling).unwrap();
+    //region AUUGGGHHH
+    let open = TileBundle::new(
+        Tile::new_empty(),
+        Tile::new_empty(),
+        Tile::new_empty(),
+        Tile::new_empty(),
+        ceiling_tile.clone(),
+        floor_tile.clone(),
+    );
+    let empty = TileBundle::new(
+        Tile::new_empty(),
+        Tile::new_empty(),
+        Tile::new_empty(),
+        Tile::new_empty(),
+        Tile::new_empty(),
+        Tile::new_empty(),
+    );
+    let north_wall = TileBundle::new(
+        Tile::new_empty(),
+        wall_tile.clone(),
+        Tile::new_empty(),
+        Tile::new_empty(),
+        ceiling_tile.clone(),
+        floor_tile.clone(),
+    );
+    let east_wall = TileBundle::new(
+        Tile::new_empty(),
+        Tile::new_empty(),
+        wall_tile.clone(),
+        Tile::new_empty(),
+        ceiling_tile.clone(),
+        floor_tile.clone(),
+    );
+    let south_wall = TileBundle::new(
+        Tile::new_empty(),
+        Tile::new_empty(),
+        Tile::new_empty(),
+        wall_tile.clone(),
+        ceiling_tile.clone(),
+        floor_tile.clone(),
+    );
+    let west_wall = TileBundle::new(
+        wall_tile.clone(),
+        Tile::new_empty(),
+        Tile::new_empty(),
+        Tile::new_empty(),
+        ceiling_tile.clone(),
+        floor_tile.clone(),
+    );
+    let north_west_corner = TileBundle::new(
+        wall_tile.clone(),
+        wall_tile.clone(),
+        Tile::new_empty(),
+        Tile::new_empty(),
+        ceiling_tile.clone(),
+        floor_tile.clone(),
+    );
+    let north_east_corner = TileBundle::new(
+        Tile::new_empty(),
+        wall_tile.clone(),
+        wall_tile.clone(),
+        Tile::new_empty(),
+        ceiling_tile.clone(),
+        floor_tile.clone(),
+    );
+    let south_east_corner = TileBundle::new(
+        Tile::new_empty(),
+        Tile::new_empty(),
+        wall_tile.clone(),
+        wall_tile.clone(),
+        ceiling_tile.clone(),
+        floor_tile.clone(),
+    );
+    let south_west_corner = TileBundle::new(
+        wall_tile.clone(),
+        Tile::new_empty(),
+        Tile::new_empty(),
+        wall_tile.clone(),
+        ceiling_tile.clone(),
+        floor_tile.clone(),
+    );
+    let north_south_hallway = TileBundle::new(
+        wall_tile.clone(),
+        Tile::new_empty(),
+        wall_tile.clone(),
+        Tile::new_empty(),
+        ceiling_tile.clone(),
+        floor_tile.clone(),
+    );
+    let east_west_hallway = TileBundle::new(
+        Tile::new_empty(),
+        wall_tile.clone(),
+        Tile::new_empty(),
+        wall_tile.clone(),
+        ceiling_tile.clone(),
+        floor_tile.clone(),
+    );
+    let north_hallway_end = TileBundle::new(
+        wall_tile.clone(),
+        wall_tile.clone(),
+        wall_tile.clone(),
+        Tile::new_empty(),
+        ceiling_tile.clone(),
+        floor_tile.clone(),
+    );
+    let east_hallway_end = TileBundle::new(
+        Tile::new_empty(),
+        wall_tile.clone(),
+        wall_tile.clone(),
+        wall_tile.clone(),
+        ceiling_tile.clone(),
+        floor_tile.clone(),
+    );
+    let south_hallway_end = TileBundle::new(
+        wall_tile.clone(),
+        Tile::new_empty(),
+        wall_tile.clone(),
+        wall_tile.clone(),
+        ceiling_tile.clone(),
+        floor_tile.clone(),
+    );
+    let west_hallway_end = TileBundle::new(
+        wall_tile.clone(),
+        wall_tile.clone(),
+        Tile::new_empty(),
+        wall_tile.clone(),
+        ceiling_tile.clone(),
+        floor_tile.clone(),
+    );
+    let map = &mut tile_bundle_preset_map.0;
+    map.insert(TileBundlePreset::Open, open);
+    map.insert(TileBundlePreset::Empty, empty);
+    map.insert(TileBundlePreset::ForwardWall, north_wall);
+    map.insert(TileBundlePreset::RightWall, east_wall);
+    map.insert(TileBundlePreset::BackWall, south_wall);
+    map.insert(TileBundlePreset::LeftWall, west_wall);
+    map.insert(TileBundlePreset::ForwardLeftCorner, north_west_corner);
+    map.insert(TileBundlePreset::ForwardRightCorner, north_east_corner);
+    map.insert(TileBundlePreset::BackRightCorner, south_east_corner);
+    map.insert(TileBundlePreset::BackLeftCorner, south_west_corner);
+    map.insert(TileBundlePreset::ForwardBackHallway, north_south_hallway);
+    map.insert(TileBundlePreset::LeftRightHallway, east_west_hallway);
+    map.insert(TileBundlePreset::ForwardHallwayEnd, north_hallway_end);
+    map.insert(TileBundlePreset::RightHallwayEnd, east_hallway_end);
+    map.insert(TileBundlePreset::BackHallwayEnd, south_hallway_end);
+    map.insert(TileBundlePreset::LeftHallwayEnd, west_hallway_end);
+    //endregion
 }
 
 pub enum TileDirection {
@@ -225,6 +236,25 @@ pub struct GridPosition {
     pub col: usize,
 }
 
+impl GridPosition {
+    pub fn to_player_vec3(self) -> Vec3 {
+        Vec3::new(self.col as f32, 1.0, self.row as f32)
+    }
+
+    pub fn to_cell_vec3(self) -> Vec3 {
+        Vec3::new(self.col as f32, 0.0, self.row as f32)
+    }
+}
+
+impl From<[u8; 2]> for GridPosition {
+    fn from(value: [u8; 2]) -> Self {
+        GridPosition {
+            row: value[0] as usize,
+            col: value[1] as usize,
+        }
+    }
+}
+
 #[derive(Bundle)]
 pub struct DungeonCell {
     pub cell_type: DungeonCellType,
@@ -234,18 +264,19 @@ pub struct DungeonCell {
 }
 
 impl DungeonCell {
-    pub fn from_preset(preset: TileBundlePreset) -> Self {
+    pub fn from_tile_bundle(bundle: TileBundle) -> Self {
         // positions are handled by grid
         DungeonCell {
             cell_type: DungeonCellType::Basic,
             spatial_bundle: SpatialBundle::from_transform(Transform::from_translation(Vec3::ZERO)),
-            tile_bundle: TILE_BUNDLE_PRESET_MAP.get(&preset).unwrap().clone(),
+            tile_bundle: bundle,
             grid_position: GridPosition { row: 0, col: 0 },
         }
     }
 
-    pub fn set_position(&mut self, position: Vec3) {
-        self.spatial_bundle.transform.translation = position;
+    pub fn set_position(&mut self, grid_position: GridPosition) {
+        self.spatial_bundle.transform.translation = grid_position.to_cell_vec3();
+        self.grid_position = grid_position;
     }
 }
 
@@ -316,6 +347,7 @@ impl TileBundle {
 }
 
 pub fn spawn_dungeon_cell(cell: DungeonCell, commands: &mut Commands) -> DungeonCell {
+    // TODO: ADAPTERS-16
     let cloned_cell = cell.clone();
     let left = commands.spawn(cell.tile_bundle.left).id();
     let forward = commands.spawn(cell.tile_bundle.forward).id();

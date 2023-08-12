@@ -1,9 +1,8 @@
 use std::f32::consts::PI;
-use std::sync::Mutex;
 
 use bevy::prelude::*;
 use bevy::utils::HashMap;
-use lazy_static::lazy_static;
+use bevy_asset_loader::prelude::AssetCollection;
 
 const QUAD_WIDTH: f32 = 1.0;
 
@@ -14,19 +13,83 @@ pub enum PurpleTexture {
     Ceiling,
 }
 
-lazy_static! {
-    static ref TILE_MESH: Mutex<Handle<Mesh>> = Mutex::new(Handle::default());
-    static ref PURPLE_TEXTURE_PATHS: HashMap<PurpleTexture, &'static str> = {
-        let mut m = HashMap::new();
-        m.insert(PurpleTexture::Wall, "img/dun/wall1.png");
-        m.insert(PurpleTexture::Floor, "img/dun/floor.png");
-        m.insert(PurpleTexture::Ceiling, "img/dun/plainCeiling.png");
-        m
-    };
-    static ref PURPLE_TEXTURE_HANDLES: Mutex<HashMap<PurpleTexture, Handle<Image>>> =
-        Mutex::new(HashMap::new());
-    static ref PURPLE_MATERIALS: Mutex<HashMap<PurpleTexture, Handle<StandardMaterial>>> =
-        Mutex::new(HashMap::new());
+#[derive(AssetCollection, Resource)]
+pub struct PurpleTileAssets {
+    #[asset(standard_material)]
+    #[asset(path = "img/dun/wall1.png")]
+    pub wall: Handle<StandardMaterial>,
+    #[asset(standard_material)]
+    #[asset(path = "img/dun/floor.png")]
+    pub floor: Handle<StandardMaterial>,
+    #[asset(standard_material)]
+    #[asset(path = "img/dun/plainCeiling.png")]
+    pub ceiling: Handle<StandardMaterial>,
+}
+
+#[derive(Resource)]
+pub struct PurpleTileTextureMap(pub HashMap<PurpleTexture, Tile>);
+
+impl FromWorld for PurpleTileTextureMap {
+    fn from_world(world: &mut World) -> Self {
+        let cell = world.cell();
+        let tile_material_handles = cell
+            .get_resource_mut::<PurpleTileAssets>()
+            .expect("failed to get purple tile asset handles");
+        let mut meshes = cell
+            .get_resource_mut::<Assets<Mesh>>()
+            .expect("failed to get meshes");
+        let mut materials = cell
+            .get_resource_mut::<Assets<StandardMaterial>>()
+            .expect("failed to get meshes");
+        let mesh_handle = meshes.add(Mesh::from(shape::Box::new(
+            QUAD_WIDTH,
+            QUAD_WIDTH,
+            f32::EPSILON,
+        )));
+        let wall_handle = &tile_material_handles.wall;
+        let floor_handle = &tile_material_handles.floor;
+        let ceiling_handle = &tile_material_handles.ceiling;
+        Tile::unlight_material(materials.get_mut(wall_handle).unwrap());
+        Tile::unlight_material(materials.get_mut(floor_handle).unwrap());
+        Tile::unlight_material(materials.get_mut(ceiling_handle).unwrap());
+        let wall = Tile {
+            tile_type: TileType::Basic,
+            pbr_bundle: PbrBundle {
+                mesh: mesh_handle.clone(),
+                material: wall_handle.clone(),
+                transform: Transform::from_xyz(0.0, 0.0, 0.0)
+                    .with_rotation(Quat::from_rotation_x(-PI / 2.0)),
+                ..default()
+            },
+        };
+        let floor = Tile {
+            tile_type: TileType::Basic,
+            pbr_bundle: PbrBundle {
+                mesh: mesh_handle.clone(),
+                material: floor_handle.clone(),
+                transform: Transform::from_xyz(0.0, 0.0, 0.0)
+                    .with_rotation(Quat::from_rotation_x(-PI / 2.0)),
+                ..default()
+            },
+        };
+        let ceiling = Tile {
+            tile_type: TileType::Basic,
+            pbr_bundle: PbrBundle {
+                mesh: mesh_handle.clone(),
+                material: ceiling_handle.clone(),
+                transform: Transform::from_xyz(0.0, 0.0, 0.0)
+                    .with_rotation(Quat::from_rotation_x(-PI / 2.0)),
+                ..default()
+            },
+        };
+
+        let map = HashMap::from([
+            (PurpleTexture::Wall, wall),
+            (PurpleTexture::Floor, floor),
+            (PurpleTexture::Ceiling, ceiling),
+        ]);
+        PurpleTileTextureMap(map)
+    }
 }
 
 #[derive(Component, PartialEq, Clone, Debug)]
@@ -41,56 +104,7 @@ pub struct Tile {
     pbr_bundle: PbrBundle,
 }
 
-pub fn load_handles(
-    asset_server: Res<AssetServer>,
-    mut meshes: ResMut<Assets<Mesh>>,
-    mut materials: ResMut<Assets<StandardMaterial>>,
-) {
-    println!("here nyow");
-    let mut tile_mesh = TILE_MESH.lock().unwrap();
-    *tile_mesh = meshes.add(Mesh::from(shape::Box::new(
-        QUAD_WIDTH,
-        QUAD_WIDTH,
-        f32::EPSILON,
-    )));
-    for (&pt, &path) in PURPLE_TEXTURE_PATHS.iter() {
-        let image: Handle<Image> = asset_server.load(path);
-        let material = materials.add(StandardMaterial {
-            base_color_texture: Some(image.clone()),
-            alpha_mode: AlphaMode::Blend,
-            unlit: true,
-            ..default()
-        });
-        PURPLE_MATERIALS
-            .lock()
-            .unwrap()
-            .insert(pt, material.clone());
-        PURPLE_TEXTURE_HANDLES
-            .lock()
-            .unwrap()
-            .insert(pt, image.clone());
-    }
-}
-
 impl Tile {
-    pub fn from_texture_enum(purple_texture: PurpleTexture) -> Self {
-        Tile {
-            tile_type: TileType::Basic,
-            pbr_bundle: PbrBundle {
-                mesh: TILE_MESH.lock().unwrap().clone(),
-                material: PURPLE_MATERIALS
-                    .lock()
-                    .unwrap()
-                    .get(&purple_texture)
-                    .unwrap()
-                    .clone(),
-                transform: Transform::from_xyz(0.0, 0.0, 0.0)
-                    .with_rotation(Quat::from_rotation_x(-PI / 2.0)),
-                ..default()
-            },
-        }
-    }
-
     pub fn new_empty() -> Self {
         Tile {
             tile_type: TileType::Empty,
@@ -101,24 +115,8 @@ impl Tile {
     pub fn set_tile_transform(&mut self, transform: Transform) {
         self.pbr_bundle.transform = transform;
     }
-}
 
-impl Default for Tile {
-    fn default() -> Self {
-        Tile {
-            tile_type: TileType::Basic,
-            pbr_bundle: PbrBundle {
-                mesh: TILE_MESH.lock().unwrap().clone(),
-                material: PURPLE_MATERIALS
-                    .lock()
-                    .unwrap()
-                    .get(&PurpleTexture::Wall)
-                    .unwrap()
-                    .clone(),
-                transform: Transform::from_xyz(0.0, 0.0, 0.0)
-                    .with_rotation(Quat::from_rotation_x(-PI / 2.0)),
-                ..default()
-            },
-        }
+    pub fn unlight_material(material: &mut StandardMaterial) {
+        material.unlit = true;
     }
 }
