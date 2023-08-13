@@ -285,6 +285,19 @@ impl From<i8> for GridDirection {
     }
 }
 
+impl Into<Vec3> for GridDirection {
+    fn into(self) -> Vec3 {
+        match self {
+            GridDirection::Left => Vec3::new(-1.0, 0.0, 0.0),
+            GridDirection::Forward => Vec3::new(0.0, 0.0, -1.0),
+            GridDirection::Right => Vec3::new(1.0, 0.0, 0.0),
+            GridDirection::Back => Vec3::new(0.0, 0.0, 1.0),
+            GridDirection::Top => Vec3::new(0.0, 1.0, 0.0),
+            GridDirection::Bottom => Vec3::new(0.0, -1.0, 0.0),
+        }
+    }
+}
+
 #[derive(Component, PartialEq, Clone, Copy, Debug)]
 pub enum DungeonCellType {
     Basic,

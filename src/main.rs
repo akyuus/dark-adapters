@@ -1,10 +1,11 @@
-use bevy::prelude::*;
 use std::f32::consts::PI;
 use std::time::Duration;
 
+use bevy::prelude::*;
 use bevy::window::close_on_esc;
 use bevy_asset_loader::prelude::{LoadingState, LoadingStateAppExt};
 use bevy_common_assets::json::JsonAssetPlugin;
+use bevy_embedded_assets::EmbeddedAssetPlugin;
 use bevy_tweening::lens::{TransformPositionLens, TransformRotationLens};
 use bevy_tweening::{Animator, AnimatorState, EaseMethod, RepeatStrategy, Tween, TweeningPlugin};
 
@@ -14,6 +15,10 @@ use crate::model::tile::{PurpleTileAssets, PurpleTileTextureMap, TileType};
 
 mod model;
 
+const WALK_ANIMATION_DURATION: f32 = 0.3;
+const ROTATE_ANIMATION_DURATION: f32 = 0.3;
+const COLLIDE_ANIMATION_DURATION: f32 = 0.08;
+
 #[derive(Debug, Clone, Copy, Default, Eq, PartialEq, Hash, States)]
 enum GameState {
     #[default]
@@ -21,19 +26,16 @@ enum GameState {
     Ready,
 }
 
-#[derive(Clone, Copy, PartialEq)]
+#[derive(Clone, Copy, PartialEq, Debug, Component)]
 enum MovementState {
     Stationary,
     Walking,
     Rotating,
+    Colliding,
 }
 
 #[derive(Component)]
-struct Player {
-    movement_state: MovementState,
-}
-
-// struct TranslatePlayerEvent(Entity);
+struct Player;
 
 fn main() {
     App::new()
@@ -48,7 +50,9 @@ fn main() {
         .init_resource_after_loading_state::<_, TileBundlePresetMap>(GameState::LoadingAssets)
         .init_resource_after_loading_state::<_, DungeonTileLookup>(GameState::LoadingAssets)
         .add_plugins((
-            DefaultPlugins.set(ImagePlugin::default_nearest()),
+            DefaultPlugins
+                .set(ImagePlugin::default_nearest())
+                .add_before::<AssetPlugin, _>(EmbeddedAssetPlugin),
             TweeningPlugin,
             JsonAssetPlugin::<RawDungeonData>::new(&["dungeon.json"]),
         ))
@@ -75,7 +79,6 @@ fn setup_player(
     dungeon_assets: Res<DungeonAssets>,
 ) {
     // player
-    // TODO: bundle this
     let grid_pos: GridPosition = raw_dungeon_data
         .get(&dungeon_assets.raw_dungeon_data)
         .unwrap()
@@ -89,9 +92,7 @@ fn setup_player(
     let player_pos = grid_pos.to_player_vec3();
     let target = grid_pos.to_player_vec3() + 2.0 * Vec3::X;
     commands.spawn((
-        Player {
-            movement_state: MovementState::Stationary,
-        },
+        Player,
         Animator::new(Tween::new(
             EaseMethod::Linear,
             Duration::from_secs(1),
@@ -107,6 +108,7 @@ fn setup_player(
         },
         grid_pos,
         start_direction,
+        MovementState::Stationary,
     ));
 }
 
@@ -116,95 +118,97 @@ fn try_move_player(
     mut player_query: Query<
         (
             Entity,
-            &mut Player,
+            &Player,
             &mut Transform,
             &mut Animator<Transform>,
             &mut GridPosition,
             &mut GridDirection,
+            &mut MovementState,
         ),
         With<Camera>,
     >,
     tile_type_query: Query<(Entity, &TileType)>,
 ) {
-    let (_id, mut player, transform, mut animator, mut grid_pos, mut grid_direction) =
-        player_query.single_mut();
-    // animation over?
-    if animator.tweenable().duration().as_secs_f32() - animator.tweenable().elapsed().as_secs_f32()
-        < f32::EPSILON
-        && animator.state == AnimatorState::Playing
-        && player.movement_state != MovementState::Stationary
-    {
-        player.movement_state = MovementState::Stationary;
-        animator.state = AnimatorState::Paused;
-    }
+    let (
+        _id,
+        _,
+        transform,
+        mut animator,
+        mut grid_pos,
+        mut grid_direction,
+        mut current_movement_state,
+    ) = player_query.single_mut();
 
-    // player moving?
-    if player.movement_state != MovementState::Stationary {
-        return;
-    }
-
-    let mut translate_diff = Vec3::ZERO;
+    let mut translate_player = false;
     let mut rotate_diff = 0_f32;
-    let mut movement_state = MovementState::Stationary;
     let mut direction_to_translate = GridDirection::Forward;
     let mut direction_to_rotate = GridDirection::Right;
 
     //region keyboard input
-    if keyboard_input.just_pressed(KeyCode::Up) {
-        translate_diff = transform.forward();
-        direction_to_translate = *grid_direction;
-    } else if keyboard_input.just_pressed(KeyCode::Down) {
-        translate_diff = -transform.forward();
-        direction_to_translate = grid_direction.get_inverse_direction();
-    } else if keyboard_input.just_pressed(KeyCode::Left) {
+    if keyboard_input.pressed(KeyCode::Left) {
         rotate_diff = PI / 2.0;
         direction_to_rotate = GridDirection::Left
-    } else if keyboard_input.just_pressed(KeyCode::Right) {
+    } else if keyboard_input.pressed(KeyCode::Right) {
         rotate_diff = -PI / 2.0;
         direction_to_rotate = GridDirection::Right;
     }
+    if keyboard_input.pressed(KeyCode::Up) {
+        direction_to_translate = *grid_direction;
+        translate_player = true;
+    } else if keyboard_input.pressed(KeyCode::Down) {
+        direction_to_translate = grid_direction.get_inverse_direction();
+        translate_player = true;
+    }
     //endregion
 
-    // println!("grid direction: {:?}", grid_direction);
-    // println!("grid position:  {:?}", grid_pos);
-    if translate_diff.length_squared() > f32::EPSILON {
-        // check for collision here
+    let check_collision = || {
         let tile_entity = dungeon_tile_lookup.get_tile(*grid_pos, direction_to_translate);
         let tile_type = tile_type_query
             .get_component::<TileType>(tile_entity)
             .unwrap();
-        let collision = *tile_type != TileType::Empty;
-        if !collision {
-            movement_state = MovementState::Walking;
-            animator.set_tweenable(Tween::new(
-                EaseMethod::Linear,
-                Duration::from_secs_f32(0.3),
-                TransformPositionLens {
-                    start: transform.translation,
-                    end: transform.translation + translate_diff,
-                },
-            ));
-            // move our grid position here
-            *grid_pos = grid_pos.translated(direction_to_translate);
-        } else {
-            // hitting wall
-            let start = transform.translation;
-            let end = transform.translation + 0.3 * translate_diff;
-            let collision_tween = Tween::new(
-                EaseMethod::Linear,
-                Duration::from_secs_f32(0.1),
-                TransformPositionLens { start, end },
-            )
-            .with_repeat_count(2)
-            .with_repeat_strategy(RepeatStrategy::MirroredRepeat);
-            animator.set_tweenable(collision_tween);
-            animator.state = AnimatorState::Playing;
+        *tile_type != TileType::Empty
+    };
+
+    if can_change_state(&animator, *current_movement_state)
+        && animator.state == AnimatorState::Playing
+        && *current_movement_state != MovementState::Stationary
+    {
+        if translate_player {
+            let collision = check_collision();
+            walk_or_collide(
+                collision,
+                &mut current_movement_state,
+                &mut animator,
+                &mut grid_pos,
+                direction_to_translate,
+            );
+            return;
         }
+
+        *current_movement_state = MovementState::Stationary;
+        animator.state = AnimatorState::Paused;
+    }
+
+    // player moving?
+    if *current_movement_state != MovementState::Stationary {
+        return;
+    }
+
+    if translate_player {
+        // check for collision here
+        let collision = check_collision();
+        walk_or_collide(
+            collision,
+            &mut current_movement_state,
+            &mut animator,
+            &mut grid_pos,
+            direction_to_translate,
+        );
     } else if rotate_diff.abs() > f32::EPSILON {
-        movement_state = MovementState::Rotating;
+        *current_movement_state = MovementState::Rotating;
         animator.set_tweenable(Tween::new(
             EaseMethod::Linear,
-            Duration::from_secs_f32(0.3),
+            Duration::from_secs_f32(ROTATE_ANIMATION_DURATION),
             TransformRotationLens {
                 start: transform.rotation,
                 end: transform.rotation * Quat::from_rotation_y(rotate_diff),
@@ -213,10 +217,69 @@ fn try_move_player(
         // change our direction here
         *grid_direction = grid_direction.get_rotated_direction(direction_to_rotate);
     }
-    player.movement_state = movement_state;
 
     // play animation
-    if player.movement_state != MovementState::Stationary {
+    if *current_movement_state != MovementState::Stationary {
         animator.state = AnimatorState::Playing;
+    }
+}
+
+// TODO: probably want to separate these out into a struct?
+fn walk_or_collide(
+    collision: bool,
+    movement_state: &mut Mut<MovementState>,
+    animator: &mut Mut<Animator<Transform>>,
+    grid_pos: &mut Mut<GridPosition>,
+    direction: GridDirection,
+) {
+    // check for collision here
+    if !collision {
+        // this cannot be done outside of this if block! we could panic because grid positions are unsigned
+        let end_grid_pos = grid_pos.translated(direction);
+        **movement_state = MovementState::Walking;
+        animator.set_tweenable(Tween::new(
+            EaseMethod::Linear,
+            Duration::from_secs_f32(WALK_ANIMATION_DURATION),
+            TransformPositionLens {
+                start: grid_pos.to_player_vec3(),
+                end: end_grid_pos.to_player_vec3(),
+            },
+        ));
+        // move our grid position here
+        **grid_pos = end_grid_pos;
+    } else {
+        // hitting wall
+        let translate_diff: Vec3 = direction.try_into().unwrap();
+        let start = grid_pos.to_player_vec3();
+        let end = start + 0.3 * translate_diff;
+        let collision_tween = Tween::new(
+            EaseMethod::Linear,
+            Duration::from_secs_f32(COLLIDE_ANIMATION_DURATION),
+            TransformPositionLens { start, end },
+        )
+        .with_repeat_count(2)
+        .with_repeat_strategy(RepeatStrategy::MirroredRepeat);
+        animator.set_tweenable(collision_tween);
+        animator.state = AnimatorState::Playing;
+        **movement_state = MovementState::Colliding;
+    }
+}
+
+fn can_change_state(animator: &Animator<Transform>, movement_state: MovementState) -> bool {
+    let duration_minus_elapsed = animator.tweenable().duration().as_secs_f32()
+        - animator.tweenable().elapsed().as_secs_f32()
+        < f32::EPSILON;
+    match movement_state {
+        MovementState::Stationary => true, // no animation playing
+        MovementState::Walking | MovementState::Rotating => duration_minus_elapsed,
+        MovementState::Colliding => {
+            println!("elapsed: {}", animator.tweenable().elapsed().as_secs_f32());
+            println!(
+                "times_completed: {}",
+                animator.tweenable().times_completed()
+            );
+            // has to be 1 here because otherwise we'll switch states right when the first bounce of the collision happens
+            duration_minus_elapsed && animator.tweenable().times_completed() > 1
+        }
     }
 }
