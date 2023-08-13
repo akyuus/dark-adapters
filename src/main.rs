@@ -17,7 +17,7 @@ mod model;
 
 const WALK_ANIMATION_DURATION: f32 = 0.3;
 const ROTATE_ANIMATION_DURATION: f32 = 0.3;
-const COLLIDE_ANIMATION_DURATION: f32 = 0.08;
+const COLLIDE_ANIMATION_DURATION: f32 = 0.07;
 
 #[derive(Debug, Clone, Copy, Default, Eq, PartialEq, Hash, States)]
 enum GameState {
