@@ -14,6 +14,7 @@ use crate::model::tile::{PurpleTexture, PurpleTileTextureMap, Tile};
 pub enum TileBundlePreset {
     Empty,
     Open,
+    Closed, // gay baby jail
     ForwardWall,
     RightWall,
     BackWall,
@@ -62,6 +63,14 @@ pub fn initialize_preset_map(
         Tile::new_empty(),
         Tile::new_empty(),
         Tile::new_empty(),
+    );
+    let closed = TileBundle::new(
+        wall_tile.clone(),
+        wall_tile.clone(),
+        wall_tile.clone(),
+        wall_tile.clone(),
+        ceiling_tile.clone(),
+        floor_tile.clone(),
     );
     let north_wall = TileBundle::new(
         Tile::new_empty(),
@@ -178,6 +187,7 @@ pub fn initialize_preset_map(
     let map = &mut tile_bundle_preset_map.0;
     map.insert(TileBundlePreset::Open, open);
     map.insert(TileBundlePreset::Empty, empty);
+    map.insert(TileBundlePreset::Closed, closed);
     map.insert(TileBundlePreset::ForwardWall, north_wall);
     map.insert(TileBundlePreset::RightWall, east_wall);
     map.insert(TileBundlePreset::BackWall, south_wall);

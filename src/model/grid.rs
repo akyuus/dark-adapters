@@ -47,7 +47,7 @@ impl RawDungeonData {
             (false, true, false, false) => TileBundlePreset::RightHallwayEnd,
             (false, false, true, false) => TileBundlePreset::BackHallwayEnd,
             (true, false, false, false) => TileBundlePreset::LeftHallwayEnd,
-            (false, false, false, false) => TileBundlePreset::Empty, // should never be hit
+            (false, false, false, false) => TileBundlePreset::Closed, // should never be hit
         }
     }
 
