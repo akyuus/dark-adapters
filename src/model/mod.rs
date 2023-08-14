@@ -1,3 +1,1 @@
-pub mod cell;
-pub mod grid;
-pub mod tile;
+pub mod modetraits;

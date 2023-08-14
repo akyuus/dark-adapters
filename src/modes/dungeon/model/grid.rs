@@ -4,7 +4,7 @@ use bevy::utils::HashMap;
 use bevy_asset_loader::prelude::AssetCollection;
 use serde::{Deserialize, Serialize};
 
-use crate::model::cell::{
+use crate::modes::dungeon::model::cell::{
     spawn_dungeon_cell, DungeonCell, GridDirection, GridPosition, TileBundlePreset,
     TileBundlePresetMap,
 };

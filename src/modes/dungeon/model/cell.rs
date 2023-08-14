@@ -7,8 +7,8 @@ use bevy::prelude::{
 use bevy::utils::HashMap;
 use serde::{Deserialize, Serialize};
 
-use crate::model::grid::DungeonTileLookup;
-use crate::model::tile::{PurpleTexture, PurpleTileTextureMap, Tile};
+use crate::modes::dungeon::model::grid::DungeonTileLookup;
+use crate::modes::dungeon::model::tile::{PurpleTexture, PurpleTileTextureMap, Tile};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum TileBundlePreset {
