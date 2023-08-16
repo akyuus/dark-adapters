@@ -56,6 +56,10 @@ pub fn setup_player(
         .with_state(AnimatorState::Paused),
         Camera3dBundle {
             transform: Transform::from_translation(player_pos).looking_at(target, Vec3::Y),
+            projection: Projection::Perspective(PerspectiveProjection {
+                fov: PI / 3.0,
+                ..default()
+            }),
             ..default()
         },
         grid_pos,
