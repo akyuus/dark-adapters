@@ -2,9 +2,9 @@ use bevy::prelude::*;
 use bevy::window::close_on_esc;
 use bevy_common_assets::json::JsonAssetPlugin;
 use bevy_embedded_assets::EmbeddedAssetPlugin;
-use bevy_tweening::TweeningPlugin;
+use bevy_tweening::{component_animator_system, TweeningPlugin};
 
-use crate::model::modetraits::Registerable;
+use crate::model::modetraits::RegisterTarget;
 use crate::modes::battle::battlemode::BattleMode;
 use crate::modes::dungeon::dungeonmode::DungeonMode;
 use crate::modes::dungeon::model::grid::RawDungeonData;
@@ -24,6 +24,7 @@ fn main() {
             TweeningPlugin,
             JsonAssetPlugin::<RawDungeonData>::new(&["dungeon.json"]),
         ))
+        .add_systems(Update, component_animator_system::<TextureAtlasSprite>)
         .add_systems(Update, close_on_esc)
         .register::<BattleMode>()
         .register::<DungeonMode>()

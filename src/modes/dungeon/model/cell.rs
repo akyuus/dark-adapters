@@ -285,9 +285,9 @@ impl From<i8> for GridDirection {
     }
 }
 
-impl Into<Vec3> for GridDirection {
-    fn into(self) -> Vec3 {
-        match self {
+impl From<GridDirection> for Vec3 {
+    fn from(val: GridDirection) -> Self {
+        match val {
             GridDirection::Left => Vec3::new(-1.0, 0.0, 0.0),
             GridDirection::Forward => Vec3::new(0.0, 0.0, -1.0),
             GridDirection::Right => Vec3::new(1.0, 0.0, 0.0),

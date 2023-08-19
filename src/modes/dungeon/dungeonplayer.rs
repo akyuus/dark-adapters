@@ -23,7 +23,7 @@ pub enum MovementState {
 }
 
 #[derive(Component)]
-pub struct Player;
+pub struct DungeonPlayer;
 
 pub fn setup_player(
     mut commands: Commands,
@@ -44,7 +44,7 @@ pub fn setup_player(
     let player_pos = grid_pos.to_player_vec3();
     let target = grid_pos.to_player_vec3() + 2.0 * Vec3::X;
     commands.spawn((
-        Player,
+        DungeonPlayer,
         Animator::new(Tween::new(
             EaseMethod::Linear,
             Duration::from_secs(1),
@@ -75,7 +75,7 @@ pub fn try_move_player(
     mut player_query: Query<
         (
             Entity,
-            &Player,
+            &DungeonPlayer,
             &mut Transform,
             &mut Animator<Transform>,
             &mut GridPosition,

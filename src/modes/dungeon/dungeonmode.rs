@@ -1,16 +1,17 @@
-use crate::model::modetraits::GameMode;
+use bevy::app::{App, Update};
+use bevy::prelude::{in_state, IntoSystemConfigs, OnExit};
+use bevy_asset_loader::loading_state::{LoadingState, LoadingStateAppExt};
+
+use crate::model::modetraits::Registerable;
 use crate::modes::dungeon::dungeonplayer::{setup_player, try_move_player};
 use crate::modes::dungeon::model::cell::{initialize_preset_map, TileBundlePresetMap};
 use crate::modes::dungeon::model::grid::{spawn_grid, DungeonAssets, DungeonTileLookup};
 use crate::modes::dungeon::model::tile::{PurpleTileAssets, PurpleTileTextureMap};
 use crate::modes::mode_state::GameModeState;
-use bevy::app::{App, Update};
-use bevy::prelude::{in_state, IntoSystemConfigs, OnExit};
-use bevy_asset_loader::loading_state::{LoadingState, LoadingStateAppExt};
 
 pub struct DungeonMode;
 
-impl GameMode for DungeonMode {
+impl Registerable for DungeonMode {
     fn init(app: &mut App) {
         app.add_loading_state(
             LoadingState::new(GameModeState::LoadingDungeon)
@@ -37,3 +38,5 @@ impl GameMode for DungeonMode {
         );
     }
 }
+
+// TODO: add system to darken screen (probably in ADAPTERS-29)
