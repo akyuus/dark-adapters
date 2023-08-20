@@ -4,9 +4,8 @@ use bevy_common_assets::json::JsonAssetPlugin;
 use bevy_embedded_assets::EmbeddedAssetPlugin;
 use bevy_tweening::{component_animator_system, TweeningPlugin};
 
-use crate::model::modetraits::RegisterTarget;
-use crate::modes::battle::battlemode::BattleMode;
-use crate::modes::dungeon::dungeonmode::DungeonMode;
+use crate::modes::battle::battlemode::BattleModePlugins;
+use crate::modes::dungeon::dungeonmode::DungeonModePlugins;
 use crate::modes::dungeon::model::grid::RawDungeonData;
 use crate::modes::mode_state::GameModeState;
 
@@ -26,7 +25,7 @@ fn main() {
         ))
         .add_systems(Update, component_animator_system::<TextureAtlasSprite>)
         .add_systems(Update, close_on_esc)
-        .register::<BattleMode>()
-        .register::<DungeonMode>()
+        .add_plugins(DungeonModePlugins)
+        .add_plugins(BattleModePlugins)
         .run();
 }

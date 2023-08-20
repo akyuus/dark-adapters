@@ -1,8 +1,9 @@
+use bevy::app::App;
 use std::time::Duration;
 
 use bevy::math::Vec3;
 use bevy::prelude::{
-    default, Commands, Component, Query, Res, ResMut, Resource, SpriteSheetBundle,
+    default, Commands, Component, OnEnter, OnExit, Plugin, Query, Res, ResMut, SpriteSheetBundle,
     TextureAtlasSprite, Transform, Window, With,
 };
 use bevy::sprite::Anchor;
@@ -13,24 +14,36 @@ use crate::model::spriteutils::{
     get_bottom_left_of_window, get_top_left_of_window, get_top_right_of_window,
     TextureAtlasSpriteLens,
 };
+use crate::model::tweenutils::ExitTweenValues;
 use crate::modes::battle::battlemode::BattleModeEntity;
 use crate::modes::battle::battlemoderesources::BattleModeAtlases;
+use crate::modes::mode_state::GameModeState;
 
 const BACKGROUND_TILE_FRAME_COUNT: usize = 24;
 const SCALED_BACKGROUND_TILE_WIDTH: usize = 128; // px, doubled for convenience
 const VACUUM_TWEEN_DURATION_SECS: f32 = 1.0;
 const SCROLLING_TWEEN_DURATION_SECS: f32 = 0.5;
 
-#[derive(Component)]
-pub struct BackgroundTile;
+pub struct BackgroundTilePlugin;
 
-#[derive(Resource, Default)]
-pub struct ExitTweenValues {
-    pub count: u16,
-    pub max: u16,
+impl Plugin for BackgroundTilePlugin {
+    fn build(&self, app: &mut App) {
+        app.init_resource::<ExitTweenValues<UnvacuumTween>>()
+            .add_systems(OnExit(GameModeState::LoadingBattle), spawn_background_tiles)
+            .add_systems(
+                OnEnter(GameModeState::ExitingBattle),
+                unvacuum_background_tiles,
+            );
+    }
 }
 
-pub fn spawn_background_tiles(
+#[derive(Component)]
+struct BackgroundTile;
+
+#[derive(Component, Default)]
+pub struct UnvacuumTween;
+
+fn spawn_background_tiles(
     mut commands: Commands,
     battle_mode_atlases: Res<BattleModeAtlases>,
     window_query: Query<&Window>,
@@ -90,9 +103,9 @@ pub fn spawn_background_tiles(
     }
 }
 
-pub fn unvacuum_background_tiles(
+fn unvacuum_background_tiles(
     mut query: Query<&mut Animator<TextureAtlasSprite>, With<BackgroundTile>>,
-    mut exit_tween_values: ResMut<ExitTweenValues>,
+    mut exit_tween_values: ResMut<ExitTweenValues<UnvacuumTween>>,
 ) {
     let mut count: u16 = 0;
     for mut animator in query.iter_mut() {

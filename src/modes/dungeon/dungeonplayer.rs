@@ -6,7 +6,7 @@ use bevy_tweening::lens::{TransformPositionLens, TransformRotationLens};
 use bevy_tweening::{Animator, AnimatorState, EaseMethod, RepeatStrategy, Tween};
 
 use crate::modes::dungeon::model::cell::{GridDirection, GridPosition};
-use crate::modes::dungeon::model::grid::{DungeonAssets, DungeonTileLookup, RawDungeonData};
+use crate::modes::dungeon::model::grid::DungeonTileLookup;
 use crate::modes::dungeon::model::tile::TileType;
 use crate::modes::mode_state::GameModeState;
 
@@ -25,49 +25,6 @@ pub enum MovementState {
 #[derive(Component)]
 pub struct DungeonPlayer;
 
-pub fn setup_player(
-    mut commands: Commands,
-    raw_dungeon_data: Res<Assets<RawDungeonData>>,
-    dungeon_assets: Res<DungeonAssets>,
-) {
-    // player
-    let grid_pos: GridPosition = raw_dungeon_data
-        .get(&dungeon_assets.raw_dungeon_data)
-        .unwrap()
-        .player_start_position
-        .try_into()
-        .unwrap();
-    let start_direction = raw_dungeon_data
-        .get(&dungeon_assets.raw_dungeon_data)
-        .unwrap()
-        .player_start_direction;
-    let player_pos = grid_pos.to_player_vec3();
-    let target = grid_pos.to_player_vec3() + 2.0 * Vec3::X;
-    commands.spawn((
-        DungeonPlayer,
-        Animator::new(Tween::new(
-            EaseMethod::Linear,
-            Duration::from_secs(1),
-            TransformPositionLens {
-                start: Vec3::ZERO,
-                end: Vec3::new(1., 2., -4.),
-            },
-        ))
-        .with_state(AnimatorState::Paused),
-        Camera3dBundle {
-            transform: Transform::from_translation(player_pos).looking_at(target, Vec3::Y),
-            projection: Projection::Perspective(PerspectiveProjection {
-                fov: PI / 3.0,
-                ..default()
-            }),
-            ..default()
-        },
-        grid_pos,
-        start_direction,
-        MovementState::Stationary,
-    ));
-}
-
 pub fn try_move_player(
     keyboard_input: Res<Input<KeyCode>>,
     dungeon_tile_lookup: Res<DungeonTileLookup>,
@@ -75,20 +32,18 @@ pub fn try_move_player(
     mut player_query: Query<
         (
             Entity,
-            &DungeonPlayer,
             &mut Transform,
             &mut Animator<Transform>,
             &mut GridPosition,
             &mut GridDirection,
             &mut MovementState,
         ),
-        With<Camera>,
+        With<DungeonPlayer>,
     >,
     tile_type_query: Query<(Entity, &TileType)>,
 ) {
     let (
         _id,
-        _,
         transform,
         mut animator,
         mut grid_pos,
@@ -242,5 +197,16 @@ fn can_change_state(animator: &Animator<Transform>, movement_state: MovementStat
             // has to be 1 here because otherwise we'll switch states right when the first bounce of the collision happens
             duration_minus_elapsed && animator.tweenable().times_completed() > 1
         }
+    }
+}
+
+pub struct DungeonPlayerPlugin;
+
+impl Plugin for DungeonPlayerPlugin {
+    fn build(&self, app: &mut App) {
+        app.add_systems(
+            Update,
+            try_move_player.run_if(in_state(GameModeState::InDungeon)),
+        );
     }
 }

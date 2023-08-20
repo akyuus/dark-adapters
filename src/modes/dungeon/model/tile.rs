@@ -1,8 +1,9 @@
 use std::f32::consts::PI;
 
+
 use bevy::prelude::*;
 use bevy::utils::HashMap;
-use bevy_asset_loader::prelude::AssetCollection;
+use bevy_asset_loader::prelude::{AssetCollection};
 
 const QUAD_WIDTH: f32 = 1.0;
 

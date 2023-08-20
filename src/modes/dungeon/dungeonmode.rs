@@ -1,18 +1,282 @@
-use bevy::app::{App, Update};
-use bevy::prelude::{in_state, IntoSystemConfigs, OnExit};
-use bevy_asset_loader::loading_state::{LoadingState, LoadingStateAppExt};
+use std::f32::consts::PI;
+use std::time::Duration;
 
-use crate::model::modetraits::Registerable;
-use crate::modes::dungeon::dungeonplayer::{setup_player, try_move_player};
-use crate::modes::dungeon::model::cell::{initialize_preset_map, TileBundlePresetMap};
-use crate::modes::dungeon::model::grid::{spawn_grid, DungeonAssets, DungeonTileLookup};
-use crate::modes::dungeon::model::tile::{PurpleTileAssets, PurpleTileTextureMap};
+use bevy::app::{App, PluginGroup, PluginGroupBuilder};
+use bevy::asset::{Assets, Handle};
+use bevy::math::Vec3;
+use bevy::prelude::{
+    default, AssetServer, Camera3dBundle, Commands, IntoSystemConfigs, OnExit,
+    PerspectiveProjection, Plugin, Projection, Res, ResMut, Resource, Transform,
+};
+use bevy_asset_loader::asset_collection::AssetCollection;
+use bevy_asset_loader::loading_state::{LoadingState, LoadingStateAppExt};
+use bevy_tweening::lens::TransformPositionLens;
+use bevy_tweening::{Animator, AnimatorState, EaseMethod, Tween};
+
+use crate::modes::dungeon::dungeonplayer::{DungeonPlayer, DungeonPlayerPlugin, MovementState};
+use crate::modes::dungeon::model::cell::{
+    spawn_dungeon_cell, DungeonCell, GridPosition, TileBundle, TileBundlePreset,
+    TileBundlePresetMap,
+};
+use crate::modes::dungeon::model::grid::{DungeonTileLookup, RawDungeonData};
+use crate::modes::dungeon::model::tile::{
+    PurpleTexture, PurpleTileAssets, PurpleTileTextureMap, Tile,
+};
 use crate::modes::mode_state::GameModeState;
 
-pub struct DungeonMode;
+struct DungeonMode;
 
-impl Registerable for DungeonMode {
-    fn init(app: &mut App) {
+pub struct DungeonModePlugins;
+
+#[derive(Resource, AssetCollection)]
+pub struct DungeonAssets {
+    #[asset(path = "dungeon_data/test.dungeon.json")]
+    pub raw_dungeon_data: Handle<RawDungeonData>,
+}
+
+impl DungeonMode {
+    fn initialize_preset_map(
+        tile_texture_map: ResMut<PurpleTileTextureMap>,
+        mut tile_bundle_preset_map: ResMut<TileBundlePresetMap>,
+    ) {
+        let wall_tile = tile_texture_map.0.get(&PurpleTexture::Wall).unwrap();
+        let floor_tile = tile_texture_map.0.get(&PurpleTexture::Floor).unwrap();
+        let ceiling_tile = tile_texture_map.0.get(&PurpleTexture::Ceiling).unwrap();
+        //region AUUGGGHHH
+        let open = TileBundle::new(
+            Tile::new_empty(),
+            Tile::new_empty(),
+            Tile::new_empty(),
+            Tile::new_empty(),
+            ceiling_tile.clone(),
+            floor_tile.clone(),
+        );
+        let empty = TileBundle::new(
+            Tile::new_empty(),
+            Tile::new_empty(),
+            Tile::new_empty(),
+            Tile::new_empty(),
+            Tile::new_empty(),
+            Tile::new_empty(),
+        );
+        let closed = TileBundle::new(
+            wall_tile.clone(),
+            wall_tile.clone(),
+            wall_tile.clone(),
+            wall_tile.clone(),
+            ceiling_tile.clone(),
+            floor_tile.clone(),
+        );
+        let north_wall = TileBundle::new(
+            Tile::new_empty(),
+            wall_tile.clone(),
+            Tile::new_empty(),
+            Tile::new_empty(),
+            ceiling_tile.clone(),
+            floor_tile.clone(),
+        );
+        let east_wall = TileBundle::new(
+            Tile::new_empty(),
+            Tile::new_empty(),
+            wall_tile.clone(),
+            Tile::new_empty(),
+            ceiling_tile.clone(),
+            floor_tile.clone(),
+        );
+        let south_wall = TileBundle::new(
+            Tile::new_empty(),
+            Tile::new_empty(),
+            Tile::new_empty(),
+            wall_tile.clone(),
+            ceiling_tile.clone(),
+            floor_tile.clone(),
+        );
+        let west_wall = TileBundle::new(
+            wall_tile.clone(),
+            Tile::new_empty(),
+            Tile::new_empty(),
+            Tile::new_empty(),
+            ceiling_tile.clone(),
+            floor_tile.clone(),
+        );
+        let north_west_corner = TileBundle::new(
+            wall_tile.clone(),
+            wall_tile.clone(),
+            Tile::new_empty(),
+            Tile::new_empty(),
+            ceiling_tile.clone(),
+            floor_tile.clone(),
+        );
+        let north_east_corner = TileBundle::new(
+            Tile::new_empty(),
+            wall_tile.clone(),
+            wall_tile.clone(),
+            Tile::new_empty(),
+            ceiling_tile.clone(),
+            floor_tile.clone(),
+        );
+        let south_east_corner = TileBundle::new(
+            Tile::new_empty(),
+            Tile::new_empty(),
+            wall_tile.clone(),
+            wall_tile.clone(),
+            ceiling_tile.clone(),
+            floor_tile.clone(),
+        );
+        let south_west_corner = TileBundle::new(
+            wall_tile.clone(),
+            Tile::new_empty(),
+            Tile::new_empty(),
+            wall_tile.clone(),
+            ceiling_tile.clone(),
+            floor_tile.clone(),
+        );
+        let north_south_hallway = TileBundle::new(
+            wall_tile.clone(),
+            Tile::new_empty(),
+            wall_tile.clone(),
+            Tile::new_empty(),
+            ceiling_tile.clone(),
+            floor_tile.clone(),
+        );
+        let east_west_hallway = TileBundle::new(
+            Tile::new_empty(),
+            wall_tile.clone(),
+            Tile::new_empty(),
+            wall_tile.clone(),
+            ceiling_tile.clone(),
+            floor_tile.clone(),
+        );
+        let north_hallway_end = TileBundle::new(
+            wall_tile.clone(),
+            wall_tile.clone(),
+            wall_tile.clone(),
+            Tile::new_empty(),
+            ceiling_tile.clone(),
+            floor_tile.clone(),
+        );
+        let east_hallway_end = TileBundle::new(
+            Tile::new_empty(),
+            wall_tile.clone(),
+            wall_tile.clone(),
+            wall_tile.clone(),
+            ceiling_tile.clone(),
+            floor_tile.clone(),
+        );
+        let south_hallway_end = TileBundle::new(
+            wall_tile.clone(),
+            Tile::new_empty(),
+            wall_tile.clone(),
+            wall_tile.clone(),
+            ceiling_tile.clone(),
+            floor_tile.clone(),
+        );
+        let west_hallway_end = TileBundle::new(
+            wall_tile.clone(),
+            wall_tile.clone(),
+            Tile::new_empty(),
+            wall_tile.clone(),
+            ceiling_tile.clone(),
+            floor_tile.clone(),
+        );
+        let map = &mut tile_bundle_preset_map.0;
+        map.insert(TileBundlePreset::Open, open);
+        map.insert(TileBundlePreset::Empty, empty);
+        map.insert(TileBundlePreset::Closed, closed);
+        map.insert(TileBundlePreset::ForwardWall, north_wall);
+        map.insert(TileBundlePreset::RightWall, east_wall);
+        map.insert(TileBundlePreset::BackWall, south_wall);
+        map.insert(TileBundlePreset::LeftWall, west_wall);
+        map.insert(TileBundlePreset::ForwardLeftCorner, north_west_corner);
+        map.insert(TileBundlePreset::ForwardRightCorner, north_east_corner);
+        map.insert(TileBundlePreset::BackRightCorner, south_east_corner);
+        map.insert(TileBundlePreset::BackLeftCorner, south_west_corner);
+        map.insert(TileBundlePreset::ForwardBackHallway, north_south_hallway);
+        map.insert(TileBundlePreset::LeftRightHallway, east_west_hallway);
+        map.insert(TileBundlePreset::ForwardHallwayEnd, north_hallway_end);
+        map.insert(TileBundlePreset::RightHallwayEnd, east_hallway_end);
+        map.insert(TileBundlePreset::BackHallwayEnd, south_hallway_end);
+        map.insert(TileBundlePreset::LeftHallwayEnd, west_hallway_end);
+        //endregion
+    }
+
+    fn setup_player(
+        mut commands: Commands,
+        raw_dungeon_data: Res<Assets<RawDungeonData>>,
+        dungeon_assets: Res<DungeonAssets>,
+    ) {
+        // player
+        let grid_pos: GridPosition = raw_dungeon_data
+            .get(&dungeon_assets.raw_dungeon_data)
+            .unwrap()
+            .player_start_position
+            .try_into()
+            .unwrap();
+        let start_direction = raw_dungeon_data
+            .get(&dungeon_assets.raw_dungeon_data)
+            .unwrap()
+            .player_start_direction;
+        let player_pos = grid_pos.to_player_vec3();
+        let target = grid_pos.to_player_vec3() + 2.0 * Vec3::X;
+        commands.spawn((
+            DungeonPlayer,
+            Animator::new(Tween::new(
+                EaseMethod::Linear,
+                Duration::from_secs(1),
+                TransformPositionLens {
+                    start: Vec3::ZERO,
+                    end: Vec3::new(1., 2., -4.),
+                },
+            ))
+            .with_state(AnimatorState::Paused),
+            Camera3dBundle {
+                transform: Transform::from_translation(player_pos).looking_at(target, Vec3::Y),
+                projection: Projection::Perspective(PerspectiveProjection {
+                    fov: PI / 3.0,
+                    ..default()
+                }),
+                ..default()
+            },
+            grid_pos,
+            start_direction,
+            MovementState::Stationary,
+        ));
+    }
+
+    fn spawn_grid(
+        dungeon_asset: ResMut<DungeonAssets>,
+        grid_asset: Res<Assets<RawDungeonData>>,
+        tile_bundle_map: Res<TileBundlePresetMap>,
+        mut dungeon_tile_lookup: ResMut<DungeonTileLookup>,
+        mut commands: Commands,
+    ) {
+        let grid_handle = &dungeon_asset.raw_dungeon_data;
+        let raw_dungeon_grid = grid_asset
+            .get(grid_handle)
+            .expect("failed to get raw dungeon grid out of assets");
+
+        // first we need to resize the lookup resource
+        dungeon_tile_lookup.resize(&raw_dungeon_grid.dungeon_grid);
+        let num_rows = raw_dungeon_grid.dungeon_grid.len();
+        for (i, row) in raw_dungeon_grid.dungeon_grid.iter().enumerate() {
+            // panic if this isn't a square
+            if num_rows != row.len() {
+                panic!("failed to spawn dungeon because it is not a square");
+            }
+
+            for j in 0..row.len() {
+                let preset = raw_dungeon_grid.determine_preset(i as i32, j as i32);
+                let grid_position = GridPosition { row: i, col: j };
+                let cell =
+                    DungeonCell::from_tile_bundle(tile_bundle_map.0.get(&preset).unwrap().clone());
+                spawn_dungeon_cell(cell, grid_position, &mut commands, &mut dungeon_tile_lookup);
+            }
+        }
+    }
+}
+
+impl Plugin for DungeonMode {
+    fn build(&self, app: &mut App) {
         app.add_loading_state(
             LoadingState::new(GameModeState::LoadingDungeon)
                 .continue_to_state(GameModeState::InDungeon),
@@ -25,17 +289,21 @@ impl Registerable for DungeonMode {
         .add_systems(
             OnExit(GameModeState::LoadingDungeon),
             (
-                initialize_preset_map
-                    .before(setup_player)
-                    .before(spawn_grid),
-                setup_player,
-                spawn_grid,
+                DungeonMode::initialize_preset_map
+                    .before(DungeonMode::setup_player)
+                    .before(DungeonMode::spawn_grid),
+                DungeonMode::setup_player,
+                DungeonMode::spawn_grid,
             ),
-        )
-        .add_systems(
-            Update,
-            try_move_player.run_if(in_state(GameModeState::InDungeon)),
         );
+    }
+}
+
+impl PluginGroup for DungeonModePlugins {
+    fn build(self) -> PluginGroupBuilder {
+        PluginGroupBuilder::start::<Self>()
+            .add(DungeonMode)
+            .add(DungeonPlayerPlugin)
     }
 }
 
