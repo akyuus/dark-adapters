@@ -292,6 +292,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "bevy-ui-navigation"
+version = "0.28.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1388d4da3b73f48a9686068af4e7dfa26962226e6627cf4ec45df35a6a407e69"
+dependencies = [
+ "bevy",
+ "non-empty-vec",
+]
+
+[[package]]
 name = "bevy_a11y"
 version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1433,6 +1443,7 @@ name = "dark-adapters"
 version = "0.1.0"
 dependencies = [
  "bevy",
+ "bevy-ui-navigation",
  "bevy_asset_loader",
  "bevy_common_assets",
  "bevy_embedded_assets",
@@ -2322,6 +2333,12 @@ dependencies = [
  "memchr",
  "minimal-lexical",
 ]
+
+[[package]]
+name = "non-empty-vec"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "ceeba69aa8d4c53cdceeac8f17eb2656bb88b468bbe6c0889d34edfdea26ec8b"
 
 [[package]]
 name = "notify"

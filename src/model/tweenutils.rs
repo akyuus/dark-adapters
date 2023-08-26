@@ -12,24 +12,19 @@ pub struct ExitTweenValues<T: Default + Sized + Send + Sync + 'static> {
 impl<T: Default + Sized + Send + Sync + 'static> ExitTweenValues<T> {
     pub fn step_state_when_tweens_completed<U: States + Copy>(
         next: U,
-    ) -> Box<
-        dyn FnMut(EventReader<TweenCompleted>, ResMut<ExitTweenValues<T>>, ResMut<NextState<U>>)
-            + Send
-            + Sync,
-    > {
-        Box::new(
-            move |mut event_reader: EventReader<TweenCompleted>,
-                  mut exit_tween_values: ResMut<ExitTweenValues<T>>,
-                  mut next_state: ResMut<NextState<U>>| {
-                for _ in event_reader.iter() {
-                    exit_tween_values.count += 1;
-                }
+    ) -> impl FnMut(EventReader<TweenCompleted>, ResMut<ExitTweenValues<T>>, ResMut<NextState<U>>)
+    {
+        move |mut event_reader: EventReader<TweenCompleted>,
+              mut exit_tween_values: ResMut<ExitTweenValues<T>>,
+              mut next_state: ResMut<NextState<U>>| {
+            for _ in event_reader.iter() {
+                exit_tween_values.count += 1;
+            }
 
-                if exit_tween_values.count == exit_tween_values.max {
-                    next_state.set(next);
-                    exit_tween_values.count = 0;
-                }
-            },
-        )
+            if exit_tween_values.count == exit_tween_values.max {
+                next_state.set(next);
+                exit_tween_values.count = 0;
+            }
+        }
     }
 }
