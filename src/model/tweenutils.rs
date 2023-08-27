@@ -1,5 +1,5 @@
-use bevy::prelude::{EventReader, NextState, ResMut, Resource, States};
-use bevy_tweening::TweenCompleted;
+use bevy::prelude::{EventReader, NextState, Quat, ResMut, Resource, States, Transform};
+use bevy_tweening::{Lens, TweenCompleted};
 use std::marker::PhantomData;
 
 #[derive(Resource, Default)]
@@ -26,5 +26,18 @@ impl<T: Default + Sized + Send + Sync + 'static> ExitTweenValues<T> {
                 exit_tween_values.count = 0;
             }
         }
+    }
+}
+
+pub struct PreserveQuatRotateYLens {
+    pub start_quat: Quat,
+    pub start: f32,
+    pub end: f32,
+}
+
+impl Lens<Transform> for PreserveQuatRotateYLens {
+    fn lerp(&mut self, target: &mut Transform, ratio: f32) {
+        let angle = (self.end - self.start).mul_add(ratio, self.start);
+        target.rotation = Quat::from_rotation_y(angle) * self.start_quat;
     }
 }

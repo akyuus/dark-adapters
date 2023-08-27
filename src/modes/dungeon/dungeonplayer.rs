@@ -5,7 +5,7 @@ use bevy::prelude::*;
 use bevy_tweening::lens::{TransformPositionLens, TransformRotationLens};
 use bevy_tweening::{Animator, AnimatorState, EaseMethod, RepeatStrategy, Tween};
 
-use crate::modes::dungeon::model::cell::{GridDirection, GridPosition};
+use crate::modes::dungeon::model::cell::{GridDirection, GridPosType, GridPosition};
 use crate::modes::dungeon::model::grid::DungeonTileLookup;
 use crate::modes::dungeon::model::tile::TileType;
 use crate::modes::mode_state::GameModeState;
@@ -157,8 +157,8 @@ fn walk_or_collide(
             EaseMethod::Linear,
             Duration::from_secs_f32(WALK_ANIMATION_DURATION),
             TransformPositionLens {
-                start: grid_pos.to_player_vec3(),
-                end: end_grid_pos.to_player_vec3(),
+                start: grid_pos.to_vec3(GridPosType::Player),
+                end: end_grid_pos.to_vec3(GridPosType::Player),
             },
         ));
         // move our grid position here
@@ -166,7 +166,7 @@ fn walk_or_collide(
     } else {
         // hitting wall
         let translate_diff: Vec3 = direction.try_into().unwrap();
-        let start = grid_pos.to_player_vec3();
+        let start = grid_pos.to_vec3(GridPosType::Player);
         let end = start + 0.18 * translate_diff;
         let collision_tween = Tween::new(
             EaseMethod::Linear,

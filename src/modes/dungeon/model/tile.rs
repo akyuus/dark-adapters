@@ -1,9 +1,8 @@
 use std::f32::consts::PI;
 
-
 use bevy::prelude::*;
 use bevy::utils::HashMap;
-use bevy_asset_loader::prelude::{AssetCollection};
+use bevy_asset_loader::prelude::AssetCollection;
 
 const QUAD_WIDTH: f32 = 1.0;
 
@@ -39,9 +38,6 @@ impl FromWorld for PurpleTileTextureMap {
         let mut meshes = cell
             .get_resource_mut::<Assets<Mesh>>()
             .expect("failed to get meshes");
-        let mut materials = cell
-            .get_resource_mut::<Assets<StandardMaterial>>()
-            .expect("failed to get meshes");
         let mesh_handle = meshes.add(Mesh::from(shape::Box::new(
             QUAD_WIDTH,
             QUAD_WIDTH,
@@ -50,9 +46,6 @@ impl FromWorld for PurpleTileTextureMap {
         let wall_handle = &tile_material_handles.wall;
         let floor_handle = &tile_material_handles.floor;
         let ceiling_handle = &tile_material_handles.ceiling;
-        Tile::unlight_material(materials.get_mut(wall_handle).unwrap());
-        Tile::unlight_material(materials.get_mut(floor_handle).unwrap());
-        Tile::unlight_material(materials.get_mut(ceiling_handle).unwrap());
         let wall = Tile {
             tile_type: TileType::Basic,
             pbr_bundle: PbrBundle {
@@ -115,9 +108,5 @@ impl Tile {
 
     pub fn set_tile_transform(&mut self, transform: Transform) {
         self.pbr_bundle.transform = transform;
-    }
-
-    pub fn unlight_material(material: &mut StandardMaterial) {
-        material.unlit = true;
     }
 }

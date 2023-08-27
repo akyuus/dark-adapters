@@ -1,21 +1,26 @@
-use std::f32::consts::PI;
+use std::f32::consts::{PI, TAU};
 use std::time::Duration;
 
 use bevy::app::{App, PluginGroup, PluginGroupBuilder};
 use bevy::asset::{Assets, Handle};
 use bevy::math::Vec3;
+use bevy::pbr::StandardMaterial;
 use bevy::prelude::{
     default, AssetServer, Camera3dBundle, Commands, Font, IntoSystemConfigs, OnExit,
-    PerspectiveProjection, Plugin, Projection, Res, ResMut, Resource, Transform,
+    PerspectiveProjection, Plugin, Projection, Res, ResMut, Resource, Scene, SceneBundle,
+    Transform,
 };
 use bevy_asset_loader::asset_collection::AssetCollection;
 use bevy_asset_loader::loading_state::{LoadingState, LoadingStateAppExt};
 use bevy_tweening::lens::TransformPositionLens;
-use bevy_tweening::{Animator, AnimatorState, EaseMethod, Tween};
+use bevy_tweening::{
+    Animator, AnimatorState, EaseFunction, EaseMethod, RepeatCount, RepeatStrategy, Tracks, Tween,
+};
 
+use crate::model::tweenutils::PreserveQuatRotateYLens;
 use crate::modes::dungeon::dungeonplayer::{DungeonPlayer, DungeonPlayerPlugin, MovementState};
 use crate::modes::dungeon::model::cell::{
-    spawn_dungeon_cell, DungeonCell, GridPosition, TileBundle, TileBundlePreset,
+    spawn_dungeon_cell, DungeonCell, GridPosType, GridPosition, TileBundle, TileBundlePreset,
     TileBundlePresetMap,
 };
 use crate::modes::dungeon::model::grid::{DungeonTileLookup, RawDungeonData};
@@ -34,6 +39,8 @@ pub struct DungeonAssets {
     pub raw_dungeon_data: Handle<RawDungeonData>,
     #[asset(path = "fonts/pc-9800.ttf")]
     pub ui_font: Handle<Font>,
+    #[asset(path = "model/polaroid.gltf#Scene0")]
+    pub polaroid: Handle<Scene>,
 }
 
 impl DungeonMode {
@@ -218,8 +225,8 @@ impl DungeonMode {
             .get(&dungeon_assets.raw_dungeon_data)
             .unwrap()
             .player_start_direction;
-        let player_pos = grid_pos.to_player_vec3();
-        let target = grid_pos.to_player_vec3() + 2.0 * Vec3::X;
+        let player_pos = grid_pos.to_vec3(GridPosType::Player);
+        let target = grid_pos.to_vec3(GridPosType::Player) + 2.0 * Vec3::X;
         commands.spawn((
             DungeonPlayer,
             Animator::new(Tween::new(
@@ -275,6 +282,44 @@ impl DungeonMode {
             }
         }
     }
+
+    fn spawn_item(mut commands: Commands, dungeon_assets: Res<DungeonAssets>) {
+        let grid_position: GridPosition = [3, 3].into();
+        let transform = grid_position.to_transform(GridPosType::Item);
+        let scene_bundle = SceneBundle {
+            scene: dungeon_assets.polaroid.clone(),
+            transform,
+            ..default()
+        };
+        let rotation_tween = Tween::new(
+            EaseMethod::Linear,
+            Duration::from_secs_f32(2.0),
+            PreserveQuatRotateYLens {
+                start_quat: transform.rotation,
+                start: 0.0,
+                end: TAU,
+            },
+        )
+        .with_repeat_count(RepeatCount::Infinite);
+        let bounce_tween = Tween::new(
+            EaseMethod::EaseFunction(EaseFunction::QuadraticInOut),
+            Duration::from_secs_f32(0.8),
+            TransformPositionLens {
+                start: transform.translation,
+                end: transform.translation + 0.1 * Vec3::Y,
+            },
+        )
+        .with_repeat_strategy(RepeatStrategy::MirroredRepeat)
+        .with_repeat_count(RepeatCount::Infinite);
+        let track = Tracks::new([rotation_tween, bounce_tween]);
+        commands.spawn((scene_bundle, Animator::new(track)));
+    }
+
+    fn unlight_all_materials(mut materials: ResMut<Assets<StandardMaterial>>) {
+        for (_, material) in materials.iter_mut() {
+            material.unlit = true;
+        }
+    }
 }
 
 impl Plugin for DungeonMode {
@@ -291,11 +336,14 @@ impl Plugin for DungeonMode {
         .add_systems(
             OnExit(GameModeState::LoadingDungeon),
             (
-                DungeonMode::initialize_preset_map
-                    .before(DungeonMode::setup_player)
-                    .before(DungeonMode::spawn_grid),
-                DungeonMode::setup_player,
-                DungeonMode::spawn_grid,
+                DungeonMode::initialize_preset_map,
+                (
+                    DungeonMode::unlight_all_materials,
+                    DungeonMode::setup_player,
+                    DungeonMode::spawn_grid,
+                    DungeonMode::spawn_item,
+                )
+                    .after(DungeonMode::initialize_preset_map),
             ),
         );
     }
@@ -308,5 +356,3 @@ impl PluginGroup for DungeonModePlugins {
             .add(DungeonPlayerPlugin)
     }
 }
-
-// TODO: add system to darken screen (probably in ADAPTERS-29)

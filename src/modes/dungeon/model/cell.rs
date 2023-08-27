@@ -8,7 +8,7 @@ use bevy::utils::HashMap;
 use serde::{Deserialize, Serialize};
 
 use crate::modes::dungeon::model::grid::DungeonTileLookup;
-use crate::modes::dungeon::model::tile::{Tile};
+use crate::modes::dungeon::model::tile::Tile;
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
 pub enum TileBundlePreset {
@@ -144,13 +144,29 @@ pub struct GridPosition {
     pub col: usize,
 }
 
+pub enum GridPosType {
+    Player,
+    Cell,
+    Item,
+}
+
 impl GridPosition {
-    pub fn to_player_vec3(self) -> Vec3 {
-        Vec3::new(self.col as f32, 1.0, self.row as f32)
+    pub fn to_transform(self, grid_pos_type: GridPosType) -> Transform {
+        match grid_pos_type {
+            GridPosType::Player => Transform::from_translation(self.to_vec3(grid_pos_type)),
+            GridPosType::Cell => Transform::from_translation(self.to_vec3(grid_pos_type)),
+            GridPosType::Item => Transform::from_translation(self.to_vec3(grid_pos_type))
+                .with_scale(Vec3::splat(0.3))
+                .with_rotation(Quat::from_rotation_z(PI / 7.0)),
+        }
     }
 
-    pub fn to_cell_vec3(self) -> Vec3 {
-        Vec3::new(self.col as f32, 0.0, self.row as f32)
+    pub fn to_vec3(self, grid_pos_type: GridPosType) -> Vec3 {
+        match grid_pos_type {
+            GridPosType::Player => Vec3::new(self.col as f32, 1.0, self.row as f32),
+            GridPosType::Cell => Vec3::new(self.col as f32, 0.0, self.row as f32),
+            GridPosType::Item => Vec3::new(self.col as f32, 0.75, self.row as f32),
+        }
     }
 
     pub fn translated(self, direction: GridDirection) -> Self {
@@ -205,7 +221,7 @@ impl DungeonCell {
     }
 
     pub fn set_position(&mut self, grid_position: GridPosition) {
-        self.spatial_bundle.transform.translation = grid_position.to_cell_vec3();
+        self.spatial_bundle.transform.translation = grid_position.to_vec3(GridPosType::Cell);
         self.grid_position = grid_position;
     }
 }
