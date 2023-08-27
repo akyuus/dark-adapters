@@ -11,10 +11,11 @@ use serde::Deserialize;
 use std::f32::consts::TAU;
 use std::time::Duration;
 
-#[derive(Component, Deserialize, Clone, Copy)]
+#[derive(Component, Deserialize, Clone, Copy, PartialEq)]
 pub enum ItemType {
     Polaroid,
     Key,
+    Maxwell,
 }
 
 pub struct DungeonItem;
@@ -29,8 +30,16 @@ impl DungeonItem {
         let scene_handle = match item_type {
             ItemType::Polaroid => dungeon_assets.polaroid.clone(),
             ItemType::Key => dungeon_assets.key.clone(),
+            ItemType::Maxwell => dungeon_assets.maxwell.clone(),
         };
-        let transform = grid_pos.to_transform(GridPosType::Item);
+        let transform = if item_type == ItemType::Maxwell {
+            grid_pos
+                .to_transform(GridPosType::Item)
+                .with_scale(Vec3::splat(0.01))
+        } else {
+            grid_pos.to_transform(GridPosType::Item)
+        };
+
         let scene_bundle = SceneBundle {
             scene: scene_handle,
             transform,

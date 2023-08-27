@@ -40,6 +40,8 @@ pub struct DungeonAssets {
     pub polaroid: Handle<Scene>,
     #[asset(path = "model/key.gltf#Scene0")]
     pub key: Handle<Scene>,
+    #[asset(path = "model/maxwell_the_cat_dingus.glb#Scene0")]
+    pub maxwell: Handle<Scene>,
 }
 
 impl DungeonMode {
