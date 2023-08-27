@@ -1,4 +1,4 @@
-use std::f32::consts::{PI, TAU};
+use std::f32::consts::PI;
 use std::time::Duration;
 
 use bevy::app::{App, PluginGroup, PluginGroupBuilder};
@@ -7,23 +7,20 @@ use bevy::math::Vec3;
 use bevy::pbr::StandardMaterial;
 use bevy::prelude::{
     default, AssetServer, Camera3dBundle, Commands, Font, IntoSystemConfigs, OnExit,
-    PerspectiveProjection, Plugin, Projection, Res, ResMut, Resource, Scene, SceneBundle,
-    Transform,
+    PerspectiveProjection, Plugin, Projection, Res, ResMut, Resource, Scene, Transform,
 };
 use bevy_asset_loader::asset_collection::AssetCollection;
 use bevy_asset_loader::loading_state::{LoadingState, LoadingStateAppExt};
 use bevy_tweening::lens::TransformPositionLens;
-use bevy_tweening::{
-    Animator, AnimatorState, EaseFunction, EaseMethod, RepeatCount, RepeatStrategy, Tracks, Tween,
-};
+use bevy_tweening::{Animator, AnimatorState, EaseMethod, Tween};
 
-use crate::model::tweenutils::PreserveQuatRotateYLens;
 use crate::modes::dungeon::dungeonplayer::{DungeonPlayer, DungeonPlayerPlugin, MovementState};
 use crate::modes::dungeon::model::cell::{
     spawn_dungeon_cell, DungeonCell, GridPosType, GridPosition, TileBundle, TileBundlePreset,
     TileBundlePresetMap,
 };
 use crate::modes::dungeon::model::grid::{DungeonTileLookup, RawDungeonData};
+use crate::modes::dungeon::model::items::DungeonItem;
 use crate::modes::dungeon::model::tile::{
     PurpleTexture, PurpleTileAssets, PurpleTileTextureMap, Tile,
 };
@@ -41,6 +38,8 @@ pub struct DungeonAssets {
     pub ui_font: Handle<Font>,
     #[asset(path = "model/polaroid.gltf#Scene0")]
     pub polaroid: Handle<Scene>,
+    #[asset(path = "model/key.gltf#Scene0")]
+    pub key: Handle<Scene>,
 }
 
 impl DungeonMode {
@@ -283,36 +282,19 @@ impl DungeonMode {
         }
     }
 
-    fn spawn_item(mut commands: Commands, dungeon_assets: Res<DungeonAssets>) {
-        let grid_position: GridPosition = [3, 3].into();
-        let transform = grid_position.to_transform(GridPosType::Item);
-        let scene_bundle = SceneBundle {
-            scene: dungeon_assets.polaroid.clone(),
-            transform,
-            ..default()
-        };
-        let rotation_tween = Tween::new(
-            EaseMethod::Linear,
-            Duration::from_secs_f32(2.0),
-            PreserveQuatRotateYLens {
-                start_quat: transform.rotation,
-                start: 0.0,
-                end: TAU,
-            },
-        )
-        .with_repeat_count(RepeatCount::Infinite);
-        let bounce_tween = Tween::new(
-            EaseMethod::EaseFunction(EaseFunction::QuadraticInOut),
-            Duration::from_secs_f32(0.8),
-            TransformPositionLens {
-                start: transform.translation,
-                end: transform.translation + 0.1 * Vec3::Y,
-            },
-        )
-        .with_repeat_strategy(RepeatStrategy::MirroredRepeat)
-        .with_repeat_count(RepeatCount::Infinite);
-        let track = Tracks::new([rotation_tween, bounce_tween]);
-        commands.spawn((scene_bundle, Animator::new(track)));
+    fn spawn_items(
+        mut commands: Commands,
+        dungeon_assets: Res<DungeonAssets>,
+        raw_dungeon_data: Res<Assets<RawDungeonData>>,
+    ) {
+        let data = raw_dungeon_data
+            .get(&dungeon_assets.raw_dungeon_data)
+            .unwrap();
+        for raw_item_data in data.items.iter() {
+            let item_type = raw_item_data.item_type;
+            let item_position: GridPosition = raw_item_data.item_position.into();
+            DungeonItem::spawn(&mut commands, item_type, item_position, &dungeon_assets);
+        }
     }
 
     fn unlight_all_materials(mut materials: ResMut<Assets<StandardMaterial>>) {
@@ -341,7 +323,7 @@ impl Plugin for DungeonMode {
                     DungeonMode::unlight_all_materials,
                     DungeonMode::setup_player,
                     DungeonMode::spawn_grid,
-                    DungeonMode::spawn_item,
+                    DungeonMode::spawn_items,
                 )
                     .after(DungeonMode::initialize_preset_map),
             ),

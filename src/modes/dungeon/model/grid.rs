@@ -1,19 +1,24 @@
 use bevy::prelude::*;
 use bevy::reflect::{TypePath, TypeUuid};
 use bevy::utils::HashMap;
+use serde::Deserialize;
 
-use serde::{Deserialize, Serialize};
+use crate::modes::dungeon::model::cell::{GridDirection, GridPosition, TileBundlePreset};
+use crate::modes::dungeon::model::items::ItemType;
 
-use crate::modes::dungeon::model::cell::{
-    GridDirection, GridPosition, TileBundlePreset,
-};
+#[derive(Deserialize)]
+pub struct RawDungeonItemData {
+    pub item_type: ItemType,
+    pub item_position: [u8; 2],
+}
 
-#[derive(Serialize, Deserialize, TypePath, TypeUuid)]
+#[derive(Deserialize, TypePath, TypeUuid)]
 #[uuid = "ad582585-3550-465f-a2cc-8be5ed4c540a"]
 pub struct RawDungeonData {
     pub dungeon_grid: Vec<Vec<u8>>,
     pub player_start_position: [u8; 2],
     pub player_start_direction: GridDirection,
+    pub items: Vec<RawDungeonItemData>,
 }
 
 impl RawDungeonData {
