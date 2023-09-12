@@ -6,7 +6,7 @@ use bevy::asset::{Assets, Handle};
 use bevy::math::Vec3;
 use bevy::pbr::StandardMaterial;
 use bevy::prelude::{
-    default, AssetServer, Camera3dBundle, Commands, Font, IntoSystemConfigs, OnExit,
+    default, AssetServer, Camera3dBundle, Commands, IntoSystemConfigs, OnExit,
     PerspectiveProjection, Plugin, Projection, Res, ResMut, Resource, Scene, Transform,
 };
 use bevy_asset_loader::asset_collection::AssetCollection;
@@ -34,8 +34,6 @@ pub struct DungeonModePlugins;
 pub struct DungeonAssets {
     #[asset(path = "dungeon_data/test.dungeon.json")]
     pub raw_dungeon_data: Handle<RawDungeonData>,
-    #[asset(path = "fonts/pc-9800.ttf")]
-    pub ui_font: Handle<Font>,
     #[asset(path = "model/polaroid.gltf#Scene0")]
     pub polaroid: Handle<Scene>,
     #[asset(path = "model/key.gltf#Scene0")]

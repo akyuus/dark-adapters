@@ -1,6 +1,6 @@
 use std::cmp::max;
 
-use bevy::prelude::{TextureAtlasSprite, Window};
+use bevy::prelude::{TextureAtlasSprite, Vec3, Window};
 use bevy_tweening::Lens;
 
 pub struct TextureAtlasSpriteLens {
@@ -31,4 +31,9 @@ pub fn get_bottom_left_of_window(window: &Window) -> (i32, i32) {
     let window_width = window.resolution.width() as i32;
     let window_height = window.resolution.height() as i32;
     (-window_width / 2, -window_height / 2)
+}
+
+pub fn get_middle_left_of_window(window: &Window) -> Vec3 {
+    let window_width = window.resolution.width();
+    Vec3::new(-window_width / 2.0, 0., 0.)
 }

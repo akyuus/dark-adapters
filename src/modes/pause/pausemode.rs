@@ -1,23 +1,26 @@
 use bevy::app::{App, AppExit, PluginGroupBuilder};
-use bevy::asset::AssetServer;
 use bevy::core_pipeline::clear_color::ClearColorConfig;
 use bevy::input::Input;
+use bevy::math::Vec2;
 use bevy::prelude::{
-    default, in_state, AlignItems, BuildChildren, ButtonBundle, Camera, Camera2d, Camera2dBundle,
-    Changed, Color, Commands, Component, EventReader, EventWriter, ImageBundle, IntoSystemConfigs,
-    JustifyContent, KeyCode, NextState, NodeBundle, OnEnter, OnExit, Plugin, PluginGroup, Query,
-    Res, ResMut, Resource, State, TextBundle, TextStyle, UiImage, Update, With,
+    default, in_state, BuildChildren, Camera, Camera2d, Camera2dBundle, Color, Commands, Component,
+    Event, EventReader, EventWriter, IntoSystemConfigs, KeyCode, NextState, OnEnter, OnExit,
+    Plugin, PluginGroup, Query, Res, ResMut, Resource, SpatialBundle, State, States, SystemSet,
+    Transform, Update, Window, With, Without,
 };
-use bevy::ui::{BackgroundColor, BorderColor, FlexDirection, Style, UiRect, Val};
-use bevy_ui_navigation::components::FocusableButtonBundle;
-use bevy_ui_navigation::events::NavEvent;
-use bevy_ui_navigation::prelude::{FocusState, Focusable, NavEventReaderExt};
+use bevy::sprite::{Sprite, SpriteBundle};
+use bevy_asset_loader::prelude::LoadingStateAppExt;
+use bevy_tweening::Animator;
 use bevy_ui_navigation::systems::InputMapping;
-use bevy_ui_navigation::NavRequestSystem;
 
-use crate::modes::dungeon::dungeonmode::DungeonAssets;
+use crate::model::spriteutils::get_middle_left_of_window;
+use crate::model::tweenutils::ExitTweenValues;
 use crate::modes::dungeon::dungeonplayer::{DungeonPlayer, MovementState};
 use crate::modes::mode_state::{cleanup_system, GameModeState};
+use crate::modes::pause::pausemenucard::{
+    spawn_cards, CardTween, PauseMenuButtonType, PauseMenuText,
+};
+use crate::modes::pause::pausemenucardtracker::{PauseMenuCardTracker, RotationDirection};
 
 #[derive(Resource, Default)]
 struct PreviousState(GameModeState);
@@ -25,15 +28,19 @@ struct PreviousState(GameModeState);
 #[derive(Component)]
 struct PauseModeEntity;
 
-#[derive(Component)]
-enum PauseMenuButton {
-    Resume,
-    Exit,
-}
-
 struct PauseMode;
 
+#[derive(Event)]
+struct PauseMenuCardSelected;
+
 const PAUSE_MODE_ALPHA: f32 = 0.7;
+
+#[derive(Debug, Clone, Copy, Default, Eq, PartialEq, Hash, States, SystemSet)]
+pub enum PauseMenuState {
+    #[default]
+    Stationary,
+    RotatingCard,
+}
 
 impl PauseMode {
     fn check_pause(
@@ -56,51 +63,18 @@ impl PauseMode {
         }
     }
 
-    fn update_button_borders(
-        keyboard_input: Res<Input<KeyCode>>,
-        previous_state: Res<PreviousState>,
-        mut next_state: ResMut<NextState<GameModeState>>,
-        mut button_query: Query<(&Focusable, &mut BorderColor), Changed<Focusable>>,
-    ) {
-        for (focusable, mut border_color) in button_query.iter_mut() {
-            match focusable.state() {
-                FocusState::Focused => border_color.0 = Color::RED,
-                _ => border_color.0 = Color::PURPLE,
-            }
-        }
-        if keyboard_input.just_pressed(KeyCode::Escape) {
-            next_state.set(previous_state.0);
-        }
-    }
-
-    fn button_activation_system(
-        mut button_query: Query<&mut PauseMenuButton>,
-        mut events: EventReader<NavEvent>,
-        previous_state: Res<PreviousState>,
-        mut next_state: ResMut<NextState<GameModeState>>,
-        mut exit: EventWriter<AppExit>,
-    ) {
-        events.nav_iter().activated_in_query_foreach_mut(
-            &mut button_query,
-            |button| match *button {
-                PauseMenuButton::Resume => {
-                    next_state.set(previous_state.0);
-                }
-                PauseMenuButton::Exit => exit.send(AppExit),
-            },
-        )
-    }
-
     fn darken_screen_and_show_menu(
         mut commands: Commands,
-        asset_server: Res<AssetServer>,
         mut input_mapping: ResMut<InputMapping>,
-        dungeon_assets: Res<DungeonAssets>,
+        mut pause_menu_card_tracker: ResMut<PauseMenuCardTracker>,
+        window_query: Query<&Window>,
     ) {
         input_mapping.keyboard_navigation = true;
         input_mapping.key_action = KeyCode::Z;
         input_mapping.key_free = KeyCode::F24;
         input_mapping.focus_follows_mouse = false;
+
+        let window = window_query.single();
 
         // region camera
         commands.spawn((
@@ -118,105 +92,143 @@ impl PauseMode {
         ));
         //endregion
 
-        let black_background = NodeBundle {
-            style: Style {
-                width: Val::Percent(100.),
-                flex_direction: FlexDirection::Column,
-                justify_content: JustifyContent::Center,
-                align_items: AlignItems::Center,
-                ..default()
-            },
-            background_color: BackgroundColor(Color::BLACK.with_a(PAUSE_MODE_ALPHA)),
-            ..default()
-        };
-
-        let menu = ImageBundle {
-            image: UiImage {
-                texture: asset_server.load("pause/pause_menu_container.png"),
-                ..default()
-            },
-            style: Style {
-                width: Val::Percent(30.),
-                height: Val::Percent(40.),
-                flex_direction: FlexDirection::Column,
-                align_items: AlignItems::Center,
-                justify_content: JustifyContent::SpaceEvenly,
+        let black_background = SpriteBundle {
+            sprite: Sprite {
+                color: Color::BLACK.with_a(PAUSE_MODE_ALPHA),
+                custom_size: Some(Vec2::new(window.width() + 10.0, window.height() + 10.0)),
                 ..default()
             },
             ..default()
         };
 
-        let pause_menu_button = FocusableButtonBundle {
-            button_bundle: ButtonBundle {
-                style: Style {
-                    width: Val::Percent(80.),
-                    height: Val::Percent(30.),
-                    align_items: AlignItems::Center,
-                    justify_content: JustifyContent::Center,
-                    border: UiRect::all(Val::Px(5.)),
-                    ..default()
-                },
-                background_color: Color::NONE.into(),
-                border_color: BorderColor(Color::PURPLE),
-                ..default()
-            },
+        // initial card order
+        let card_types = [
+            PauseMenuButtonType::Resume,
+            PauseMenuButtonType::Resume,
+            PauseMenuButtonType::Resume,
+            PauseMenuButtonType::Resume,
+            PauseMenuButtonType::Exit,
+        ];
+        // let current_index = 2;
+
+        // mak
+        let anchor_point = get_middle_left_of_window(window);
+        pause_menu_card_tracker.anchor_point = anchor_point;
+
+        let menu_anchor = SpatialBundle {
+            transform: Transform::from_translation(anchor_point),
             ..default()
         };
 
-        let resume_text_bundle = TextBundle::from_section(
-            "Resume",
-            TextStyle {
-                font: dungeon_assets.ui_font.clone(),
-                font_size: 50.0,
-                color: Color::WHITE,
-            },
-        );
-
-        let exit_text_bundle = TextBundle::from_section(
-            "Exit game",
-            TextStyle {
-                font: dungeon_assets.ui_font.clone(),
-                font_size: 50.0,
-                color: Color::WHITE,
-            },
-        );
-
+        commands.spawn((black_background, PauseModeEntity));
         commands
-            .spawn((black_background, PauseModeEntity))
-            .with_children(|root_background| {
-                root_background.spawn(menu).with_children(|menu| {
-                    menu.spawn((pause_menu_button.clone(), PauseMenuButton::Resume))
-                        .with_children(|b| {
-                            b.spawn(resume_text_bundle);
-                        });
-                    menu.spawn((pause_menu_button.clone(), PauseMenuButton::Exit))
-                        .with_children(|b| {
-                            b.spawn(exit_text_bundle);
-                        });
-                });
+            .spawn((menu_anchor, PauseModeEntity))
+            .with_children(|anchor| {
+                spawn_cards(&card_types, anchor, &mut pause_menu_card_tracker);
             });
+    }
+
+    fn handle_menu_input(
+        mut card_query: Query<
+            (
+                &mut Animator<Transform>,
+                &mut Animator<Sprite>,
+                &mut Transform,
+            ),
+            (With<PauseMenuButtonType>, Without<PauseMenuText>),
+        >,
+        mut text_query: Query<&mut Transform, With<PauseMenuText>>,
+        keyboard_input: Res<Input<KeyCode>>,
+        (prev_state, mut next_game_state, mut next_pause_state): (
+            Res<PreviousState>,
+            ResMut<NextState<GameModeState>>,
+            ResMut<NextState<PauseMenuState>>,
+        ),
+        mut pause_menu_card_tracker: ResMut<PauseMenuCardTracker>,
+        mut exit_tween_values: ResMut<ExitTweenValues<CardTween>>,
+        mut event_writer: EventWriter<PauseMenuCardSelected>,
+    ) {
+        if keyboard_input.just_pressed(KeyCode::Escape) {
+            next_game_state.set(prev_state.0);
+            return;
+        }
+
+        if keyboard_input.pressed(KeyCode::Down) {
+            pause_menu_card_tracker.rotate(
+                RotationDirection::Counterclockwise,
+                &mut card_query,
+                &mut text_query,
+                &mut exit_tween_values,
+                &mut next_pause_state,
+            );
+        } else if keyboard_input.pressed(KeyCode::Up) {
+            pause_menu_card_tracker.rotate(
+                RotationDirection::Clockwise,
+                &mut card_query,
+                &mut text_query,
+                &mut exit_tween_values,
+                &mut next_pause_state,
+            );
+        }
+
+        if keyboard_input.just_pressed(KeyCode::Z) {
+            event_writer.send(PauseMenuCardSelected);
+        }
+    }
+
+    fn handle_selected_card(
+        card_type_query: Query<&PauseMenuButtonType>,
+        event_reader: EventReader<PauseMenuCardSelected>,
+        pause_menu_card_tracker: Res<PauseMenuCardTracker>,
+        (prev_state, mut next_game_state): (Res<PreviousState>, ResMut<NextState<GameModeState>>),
+        mut exit_writer: EventWriter<AppExit>,
+    ) {
+        if event_reader.is_empty() {
+            return;
+        }
+
+        let card_type = card_type_query
+            .get(pause_menu_card_tracker.cards[2])
+            .unwrap();
+        match card_type {
+            PauseMenuButtonType::Resume => next_game_state.set(prev_state.0),
+            PauseMenuButtonType::Exit => exit_writer.send(AppExit),
+        }
     }
 }
 
 impl Plugin for PauseMode {
     fn build(&self, app: &mut App) {
         app.init_resource::<PreviousState>()
+            .init_resource::<ExitTweenValues<CardTween>>()
+            .init_resource_after_loading_state::<_, PauseMenuCardTracker>(
+                GameModeState::LoadingSharedAssets,
+            ) // the font doesn't get loaded otherwise
+            .add_state::<PauseMenuState>()
+            .add_event::<PauseMenuCardSelected>()
             .add_systems(
                 OnEnter(GameModeState::Paused),
                 PauseMode::darken_screen_and_show_menu,
             )
             .add_systems(
                 Update,
+                (PauseMode::check_pause
+                    .run_if(|state: Res<State<GameModeState>>| state.can_pause()),),
+            )
+            .add_systems(
+                Update,
                 (
-                    PauseMode::check_pause
-                        .run_if(|state: Res<State<GameModeState>>| state.can_pause()),
                     (
-                        PauseMode::update_button_borders.after(PauseMode::button_activation_system),
-                        PauseMode::button_activation_system,
+                        PauseMode::handle_menu_input,
+                        PauseMode::handle_selected_card,
                     )
-                        .after(NavRequestSystem)
-                        .run_if(in_state(GameModeState::Paused)),
-                ),
+                        .run_if(in_state(PauseMenuState::Stationary)),
+                    ExitTweenValues::<CardTween>::step_state_when_tweens_completed(
+                        PauseMenuState::Stationary,
+                    )
+                    .run_if(in_state(PauseMenuState::RotatingCard)),
+                )
+                    .run_if(in_state(GameModeState::Paused)),
             )
             .add_systems(
                 OnExit(GameModeState::Paused),
