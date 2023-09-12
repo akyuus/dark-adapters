@@ -10,6 +10,7 @@ use crate::modes::dungeon::dungeonmode::DungeonModePlugins;
 use crate::modes::dungeon::model::grid::RawDungeonData;
 use crate::modes::mode_state::GameModeState;
 use crate::modes::pause::pausemode::PauseModePlugins;
+use crate::modes::sharedassets::shared::SharedAssetsPlugin;
 
 mod model;
 mod modes;
@@ -25,6 +26,14 @@ fn main() {
         .add_plugins((
             DefaultPlugins
                 .set(ImagePlugin::default_nearest())
+                .set(WindowPlugin {
+                    primary_window: Some(Window {
+                        title: "Dark Adapters".into(),
+                        resolution: [640., 360.].into(),
+                        ..default()
+                    }),
+                    ..default()
+                })
                 .add_before::<AssetPlugin, _>(EmbeddedAssetPlugin),
             TweeningPlugin,
             JsonAssetPlugin::<RawDungeonData>::new(&["dungeon.json"]),
@@ -34,5 +43,6 @@ fn main() {
         .add_plugins(DungeonModePlugins)
         .add_plugins(BattleModePlugins)
         .add_plugins(PauseModePlugins)
+        .add_plugins(SharedAssetsPlugin)
         .run();
 }

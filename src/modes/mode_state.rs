@@ -1,11 +1,11 @@
 use bevy::prelude::{
-    Commands, Component, DespawnRecursiveExt, Entity, Query,
-    States, SystemSet, With,
+    Commands, Component, DespawnRecursiveExt, Entity, Query, States, SystemSet, With,
 };
 
 #[derive(Debug, Clone, Copy, Default, Eq, PartialEq, Hash, States, SystemSet)]
 pub enum GameModeState {
     #[default]
+    LoadingSharedAssets,
     LoadingDungeon,
     InDungeon,
     LoadingBattle,
@@ -22,8 +22,6 @@ impl GameModeState {
         }
     }
 }
-
-
 
 pub fn cleanup_system<T: Component>(mut commands: Commands, q: Query<Entity, With<T>>) {
     for e in q.iter() {
