@@ -3,6 +3,7 @@ use crate::modes::dungeon::dungeonmode::DungeonAssets;
 use crate::modes::dungeon::model::cell::{GridPosType, GridPosition};
 use bevy::math::Vec3;
 use bevy::prelude::{default, Commands, Component, Res, SceneBundle};
+use bevy_mod_picking::PickableBundle;
 use bevy_tweening::lens::TransformPositionLens;
 use bevy_tweening::{
     Animator, EaseFunction, EaseMethod, RepeatCount, RepeatStrategy, Tracks, Tween,
@@ -66,6 +67,10 @@ impl DungeonItem {
         .with_repeat_strategy(RepeatStrategy::MirroredRepeat)
         .with_repeat_count(RepeatCount::Infinite);
         let track = Tracks::new([rotation_tween, bounce_tween]);
-        commands.spawn((scene_bundle, Animator::new(track)));
+        commands.spawn((
+            scene_bundle,
+            Animator::new(track),
+            PickableBundle::default(),
+        ));
     }
 }
