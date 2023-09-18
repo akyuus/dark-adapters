@@ -111,3 +111,12 @@ impl Default for DungeonTileLookup {
         DungeonTileLookup(vec![vec![HashMap::new()]])
     }
 }
+
+pub mod test_helpers {
+    use super::*;
+    use bevy::prelude::App;
+
+    pub fn setup_dungeon_tile_lookup(app: &mut App) {
+        app.insert_resource(DungeonTileLookup::default());
+    }
+}

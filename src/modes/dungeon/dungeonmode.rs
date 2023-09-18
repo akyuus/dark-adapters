@@ -14,7 +14,10 @@ use bevy_asset_loader::loading_state::{LoadingState, LoadingStateAppExt};
 use bevy_tweening::lens::TransformPositionLens;
 use bevy_tweening::{Animator, AnimatorState, EaseMethod, Tween};
 
-use crate::modes::dungeon::dungeonplayer::{DungeonPlayer, DungeonPlayerPlugin, MovementState};
+use crate::modes::dungeon::dungeonplayer::{
+    DungeonPlayer, DungeonPlayerBundle, DungeonPlayerMovementState, DungeonPlayerPlugin,
+    SpeedMultiplier,
+};
 use crate::modes::dungeon::model::cell::{
     spawn_dungeon_cell, DungeonCell, GridPosType, GridPosition, TileBundle, TileBundlePreset,
     TileBundlePresetMap,
@@ -22,11 +25,11 @@ use crate::modes::dungeon::model::cell::{
 use crate::modes::dungeon::model::grid::{DungeonTileLookup, RawDungeonData};
 use crate::modes::dungeon::model::items::DungeonItem;
 use crate::modes::dungeon::model::tile::{
-    PurpleTexture, PurpleTileAssets, PurpleTileTextureMap, Tile,
+    PurpleTileAssets, PurpleTileTextureMap, Tile, TileTexture,
 };
 use crate::modes::mode_state::GameModeState;
 
-struct DungeonMode;
+pub struct DungeonMode;
 
 pub struct DungeonModePlugins;
 
@@ -43,13 +46,13 @@ pub struct DungeonAssets {
 }
 
 impl DungeonMode {
-    fn initialize_preset_map(
+    pub fn initialize_preset_map(
         tile_texture_map: ResMut<PurpleTileTextureMap>,
         mut tile_bundle_preset_map: ResMut<TileBundlePresetMap>,
     ) {
-        let wall_tile = tile_texture_map.0.get(&PurpleTexture::Wall).unwrap();
-        let floor_tile = tile_texture_map.0.get(&PurpleTexture::Floor).unwrap();
-        let ceiling_tile = tile_texture_map.0.get(&PurpleTexture::Ceiling).unwrap();
+        let wall_tile = tile_texture_map.0.get(&TileTexture::Wall).unwrap();
+        let floor_tile = tile_texture_map.0.get(&TileTexture::Floor).unwrap();
+        let ceiling_tile = tile_texture_map.0.get(&TileTexture::Ceiling).unwrap();
         //region AUUGGGHHH
         let open = TileBundle::new(
             Tile::new_empty(),
@@ -208,7 +211,7 @@ impl DungeonMode {
         //endregion
     }
 
-    fn setup_player(
+    pub fn setup_player(
         mut commands: Commands,
         raw_dungeon_data: Res<Assets<RawDungeonData>>,
         dungeon_assets: Res<DungeonAssets>,
@@ -226,9 +229,9 @@ impl DungeonMode {
             .player_start_direction;
         let player_pos = grid_pos.to_vec3(GridPosType::Player);
         let target = grid_pos.to_vec3(GridPosType::Player) + 2.0 * Vec3::X;
-        commands.spawn((
-            DungeonPlayer,
-            Animator::new(Tween::new(
+        commands.spawn(DungeonPlayerBundle {
+            dungeon_player: DungeonPlayer,
+            animator_transform: Animator::new(Tween::new(
                 EaseMethod::Linear,
                 Duration::from_secs(1),
                 TransformPositionLens {
@@ -237,7 +240,7 @@ impl DungeonMode {
                 },
             ))
             .with_state(AnimatorState::Paused),
-            Camera3dBundle {
+            camera: Camera3dBundle {
                 transform: Transform::from_translation(player_pos).looking_at(target, Vec3::Y),
                 projection: Projection::Perspective(PerspectiveProjection {
                     fov: PI / 3.0,
@@ -247,11 +250,12 @@ impl DungeonMode {
             },
             grid_pos,
             start_direction,
-            MovementState::Stationary,
-        ));
+            movement_state: DungeonPlayerMovementState::Stationary,
+            speed_multiplier: SpeedMultiplier(1.0),
+        });
     }
 
-    fn spawn_grid(
+    pub fn spawn_grid(
         dungeon_asset: ResMut<DungeonAssets>,
         grid_asset: Res<Assets<RawDungeonData>>,
         tile_bundle_map: Res<TileBundlePresetMap>,
@@ -336,5 +340,33 @@ impl PluginGroup for DungeonModePlugins {
         PluginGroupBuilder::start::<Self>()
             .add(DungeonMode)
             .add(DungeonPlayerPlugin)
+    }
+}
+
+pub mod test_helpers {
+    use super::*;
+    use bevy::prelude::AssetPlugin;
+    use bevy_common_assets::json::JsonAssetPlugin;
+
+    pub fn setup_test_dungeon_assets(app: &mut App, raw_dungeon_data: RawDungeonData) {
+        app.add_plugins((
+            AssetPlugin::default(),
+            JsonAssetPlugin::<RawDungeonData>::new(&["irrelevant.json"]),
+        ));
+        let mut assets = app
+            .world
+            .get_resource_mut::<Assets<RawDungeonData>>()
+            .unwrap();
+
+        let handle = assets.add(raw_dungeon_data);
+
+        // use asset server to load raw dungeon data
+        let dungeon_assets = DungeonAssets {
+            raw_dungeon_data: handle,
+            polaroid: Default::default(),
+            key: Default::default(),
+            maxwell: Default::default(),
+        };
+        app.insert_resource(dungeon_assets);
     }
 }

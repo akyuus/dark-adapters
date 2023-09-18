@@ -5,6 +5,8 @@ use bevy::prelude::{
     Transform, Vec3,
 };
 use bevy::utils::HashMap;
+use bevy_mod_picking::prelude::RaycastPickTarget;
+use bevy_mod_picking::PickableBundle;
 use serde::{Deserialize, Serialize};
 
 use crate::modes::dungeon::model::grid::DungeonTileLookup;
@@ -72,24 +74,18 @@ impl GridDirection {
         tile.set_tile_transform(transform);
     }
 
-    pub fn get_rotated_direction(self, rotate_dir: GridDirection) -> Self {
-        match self {
-            GridDirection::Left
-            | GridDirection::Forward
-            | GridDirection::Right
-            | GridDirection::Back => match rotate_dir {
-                GridDirection::Left => {
-                    let num_self = self as i8;
-                    let new_dir: GridDirection = ((num_self + 3) % 4).try_into().unwrap();
-                    new_dir
-                }
-                GridDirection::Right => {
-                    let num_self = self as i8;
-                    let new_dir: GridDirection = ((num_self + 1) % 4).try_into().unwrap();
-                    new_dir
-                }
-                _ => self,
-            },
+    pub fn rotated(self, rotate_dir: GridDirection) -> Self {
+        match rotate_dir {
+            GridDirection::Left => {
+                let num_self = self as i8;
+                let new_dir: GridDirection = ((num_self + 3) % 4).try_into().unwrap();
+                new_dir
+            }
+            GridDirection::Right => {
+                let num_self = self as i8;
+                let new_dir: GridDirection = ((num_self + 1) % 4).try_into().unwrap();
+                new_dir
+            }
             _ => self,
         }
     }
@@ -144,6 +140,7 @@ pub struct GridPosition {
     pub col: usize,
 }
 
+/// Different things can be placed on a grid. This enum describes them.
 pub enum GridPosType {
     Player,
     Cell,
@@ -151,6 +148,7 @@ pub enum GridPosType {
 }
 
 impl GridPosition {
+    ///
     pub fn to_transform(self, grid_pos_type: GridPosType) -> Transform {
         match grid_pos_type {
             GridPosType::Player => Transform::from_translation(self.to_vec3(grid_pos_type)),
@@ -169,6 +167,7 @@ impl GridPosition {
         }
     }
 
+    /// this can panic! make sure to only use this when you know a collision won't occur
     pub fn translated(self, direction: GridDirection) -> Self {
         match direction {
             GridDirection::Left => GridPosition {
@@ -298,33 +297,86 @@ pub fn spawn_dungeon_cell(
     commands: &mut Commands,
     dungeon_tile_lookup: &mut ResMut<DungeonTileLookup>,
 ) {
-    // TODO: ADAPTERS-16
-
     let mut insert_into_lookup_closure = |direction: GridDirection, entity: Entity| {
         dungeon_tile_lookup.insert_tile(grid_position, direction, entity);
     };
 
     cell.set_position(grid_position);
-    let left = commands.spawn(cell.tile_bundle.left).id();
+    let left = commands
+        .spawn((
+            cell.tile_bundle.left,
+            PickableBundle::default(),
+            RaycastPickTarget::default(),
+        ))
+        .id();
     insert_into_lookup_closure(GridDirection::Left, left);
 
-    let forward = commands.spawn(cell.tile_bundle.forward).id();
+    let forward = commands
+        .spawn((
+            cell.tile_bundle.forward,
+            PickableBundle::default(),
+            RaycastPickTarget::default(),
+        ))
+        .id();
     insert_into_lookup_closure(GridDirection::Forward, forward);
 
-    let right = commands.spawn(cell.tile_bundle.right).id();
+    let right = commands
+        .spawn((
+            cell.tile_bundle.right,
+            PickableBundle::default(),
+            RaycastPickTarget::default(),
+        ))
+        .id();
     insert_into_lookup_closure(GridDirection::Right, right);
 
-    let back = commands.spawn(cell.tile_bundle.back).id();
+    let back = commands
+        .spawn((
+            cell.tile_bundle.back,
+            PickableBundle::default(),
+            RaycastPickTarget::default(),
+        ))
+        .id();
     insert_into_lookup_closure(GridDirection::Back, back);
 
-    let top = commands.spawn(cell.tile_bundle.top).id();
+    let top = commands
+        .spawn((
+            cell.tile_bundle.top,
+            PickableBundle::default(),
+            RaycastPickTarget::default(),
+        ))
+        .id();
     insert_into_lookup_closure(GridDirection::Top, top);
 
-    let bottom = commands.spawn(cell.tile_bundle.bottom).id();
+    let bottom = commands
+        .spawn((
+            cell.tile_bundle.bottom,
+            PickableBundle::default(),
+            RaycastPickTarget::default(),
+        ))
+        .id();
     insert_into_lookup_closure(GridDirection::Bottom, bottom);
 
-    let cell_id = commands.spawn((cell.cell_type, cell.spatial_bundle)).id();
+    let cell_id = commands
+        .spawn((
+            cell.cell_type,
+            cell.spatial_bundle,
+            PickableBundle::default(),
+            RaycastPickTarget::default(),
+        ))
+        .id();
     commands
         .entity(cell_id)
         .push_children(&[left, forward, right, back, top, bottom]);
+}
+
+pub mod test_helpers {
+    use super::*;
+    use crate::modes::dungeon::model::tile::test_helpers::setup_test_texture_map;
+    use bevy::prelude::App;
+
+    pub fn setup_test_tile_preset_map(app: &mut App) {
+        setup_test_texture_map(app);
+        let tile_preset_map = TileBundlePresetMap::default();
+        app.insert_resource(tile_preset_map);
+    }
 }

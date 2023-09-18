@@ -3,11 +3,13 @@ use std::f32::consts::PI;
 use bevy::prelude::*;
 use bevy::utils::HashMap;
 use bevy_asset_loader::prelude::AssetCollection;
+use bevy_inspector_egui::prelude::*;
 
 const QUAD_WIDTH: f32 = 1.0;
 
-#[derive(Hash, PartialEq, Eq, Copy, Clone, Debug)]
-pub enum PurpleTexture {
+#[derive(Reflect, Hash, PartialEq, Eq, Copy, Clone, Debug, Component, InspectorOptions)]
+#[reflect(InspectorOptions)]
+pub enum TileTexture {
     Wall,
     Floor,
     Ceiling,
@@ -27,7 +29,7 @@ pub struct PurpleTileAssets {
 }
 
 #[derive(Resource)]
-pub struct PurpleTileTextureMap(pub HashMap<PurpleTexture, Tile>);
+pub struct PurpleTileTextureMap(pub HashMap<TileTexture, Tile>);
 
 impl FromWorld for PurpleTileTextureMap {
     fn from_world(world: &mut World) -> Self {
@@ -78,9 +80,9 @@ impl FromWorld for PurpleTileTextureMap {
         };
 
         let map = HashMap::from([
-            (PurpleTexture::Wall, wall),
-            (PurpleTexture::Floor, floor),
-            (PurpleTexture::Ceiling, ceiling),
+            (TileTexture::Wall, wall),
+            (TileTexture::Floor, floor),
+            (TileTexture::Ceiling, ceiling),
         ]);
         PurpleTileTextureMap(map)
     }
@@ -108,5 +110,28 @@ impl Tile {
 
     pub fn set_tile_transform(&mut self, transform: Transform) {
         self.pbr_bundle.transform = transform;
+    }
+}
+
+#[cfg(test)]
+pub mod test {}
+
+pub mod test_helpers {
+    use super::*;
+    use bevy::prelude::App;
+
+    fn make_basic_tile() -> Tile {
+        Tile {
+            tile_type: TileType::Basic,
+            pbr_bundle: Default::default(),
+        }
+    }
+    pub fn setup_test_texture_map(app: &mut App) {
+        let mut map: HashMap<TileTexture, Tile> = HashMap::new();
+        map.insert(TileTexture::Wall, make_basic_tile());
+        map.insert(TileTexture::Floor, make_basic_tile());
+        map.insert(TileTexture::Ceiling, make_basic_tile());
+        let tile_texture_map = PurpleTileTextureMap(map);
+        app.insert_resource(tile_texture_map);
     }
 }

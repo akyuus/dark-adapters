@@ -15,7 +15,7 @@ use bevy_ui_navigation::systems::InputMapping;
 
 use crate::model::spriteutils::get_middle_left_of_window;
 use crate::model::tweenutils::ExitTweenValues;
-use crate::modes::dungeon::dungeonplayer::{DungeonPlayer, MovementState};
+use crate::modes::dungeon::dungeonplayer::{DungeonPlayer, DungeonPlayerMovementState};
 use crate::modes::mode_state::{cleanup_system, GameModeState};
 use crate::modes::pause::pausemenucard::{
     spawn_cards, CardTween, PauseMenuButtonType, PauseMenuText,
@@ -48,11 +48,11 @@ impl PauseMode {
         mut previous_state: ResMut<PreviousState>,
         current_state: Res<State<GameModeState>>,
         mut next_state: ResMut<NextState<GameModeState>>,
-        player_query: Query<&MovementState, With<DungeonPlayer>>,
+        player_query: Query<&DungeonPlayerMovementState, With<DungeonPlayer>>,
     ) {
         // don't allow pausing when moving
         if let Ok(&movement_state) = player_query.get_single() {
-            if !(movement_state == MovementState::Stationary) {
+            if !(movement_state == DungeonPlayerMovementState::Stationary) {
                 return;
             }
         }
