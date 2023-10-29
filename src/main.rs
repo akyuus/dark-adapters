@@ -1,3 +1,4 @@
+use bevy::diagnostic::{FrameTimeDiagnosticsPlugin, LogDiagnosticsPlugin};
 use bevy::prelude::*;
 use bevy::text::TextSettings;
 use bevy_common_assets::json::JsonAssetPlugin;
@@ -11,9 +12,11 @@ use crate::modes::dungeon::model::grid::RawDungeonData;
 use crate::modes::mode_state::GameModeState;
 use crate::modes::pause::pausemode::PauseModePlugins;
 use crate::modes::sharedassets::shared::SharedAssetsPlugin;
+use crate::utils::utilresources::WindowScaleFactor;
+use crate::utils::utilsystems::{resize_sprite_system, resize_text_system};
 
-mod model;
 mod modes;
+mod utils;
 
 fn main() {
     App::new()
@@ -22,6 +25,7 @@ fn main() {
             allow_dynamic_font_size: true,
             ..default()
         })
+        .insert_resource(WindowScaleFactor(2.0))
         .add_state::<GameModeState>()
         .add_plugins((
             DefaultPlugins
@@ -29,7 +33,8 @@ fn main() {
                 .set(WindowPlugin {
                     primary_window: Some(Window {
                         title: "Dark Adapters".into(),
-                        resolution: [640., 360.].into(),
+                        resolution: [1280., 720.].into(),
+                        resizable: false,
                         ..default()
                     }),
                     ..default()
@@ -38,8 +43,18 @@ fn main() {
             TweeningPlugin,
             JsonAssetPlugin::<RawDungeonData>::new(&["dungeon.json"]),
             DefaultNavigationPlugins,
+            LogDiagnosticsPlugin::default(),
+            FrameTimeDiagnosticsPlugin::default(),
+            // WorldInspectorPlugin::new(),
         ))
-        .add_systems(Update, component_animator_system::<TextureAtlasSprite>)
+        .add_systems(
+            Update,
+            (
+                component_animator_system::<TextureAtlasSprite>,
+                resize_sprite_system,
+                resize_text_system,
+            ),
+        )
         .add_plugins(DungeonModePlugins)
         .add_plugins(BattleModePlugins)
         .add_plugins(PauseModePlugins)

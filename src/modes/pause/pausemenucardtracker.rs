@@ -8,10 +8,11 @@ use bevy::prelude::{
 use bevy_tweening::lens::{SpriteColorLens, TransformScaleLens};
 use bevy_tweening::{Animator, EaseFunction, EaseMethod, Tracks, Tween};
 
-use crate::model::tweenutils::{ExitTweenValues, RotatePauseMenuCardLens};
-use crate::modes::pause::pausemenucard::{CardTween, PauseMenuButtonType, PauseMenuText};
+use crate::modes::pause::pausemenucard::{CardTween, PauseMenuCardType, PauseMenuText};
 use crate::modes::pause::pausemode::PauseMenuState;
 use crate::modes::sharedassets::shared::FontAssets;
+use crate::utils::tweenutils::{ExitTweenValues, RotatePauseMenuCardLens, TransformZValueLens};
+use crate::utils::utilresources::WindowScaleFactor;
 
 pub const PAUSE_BUTTON_CARD_WIDTH: f32 = 194.;
 pub const PAUSE_BUTTON_CARD_HEIGHT: f32 = 114.;
@@ -42,6 +43,7 @@ impl FromWorld for PauseMenuCardTracker {
         let mut angles = [0_f32; 5];
         let mut transforms = [Transform::default(); 5];
         let mut colors = [Color::NONE; 5];
+        let scale_factor = world.get_resource::<WindowScaleFactor>().unwrap().0;
         for i in 0..5 {
             // idk why i have to do it like this
             let z_value = if i == 2 {
@@ -63,9 +65,12 @@ impl FromWorld for PauseMenuCardTracker {
             };
             angles[i] = angle;
             colors[i] = color;
-            let card_transform =
-                Transform::from_xyz(PAUSE_BUTTON_CARD_WIDTH / 2.0 - 20.0, 0., z_value)
-                    .with_scale(Vec3::new(scale_value, scale_value, 1.0));
+            let card_transform = Transform::from_xyz(
+                (PAUSE_BUTTON_CARD_WIDTH / 2.0 - 20.0) * scale_factor,
+                0.,
+                z_value,
+            )
+            .with_scale(Vec3::new(scale_value, scale_value, 1.0));
             transforms[i] = card_transform;
         }
         //endregion
@@ -96,7 +101,7 @@ impl PauseMenuCardTracker {
                 &mut Animator<Sprite>,
                 &mut Transform,
             ),
-            (With<PauseMenuButtonType>, Without<PauseMenuText>),
+            (With<PauseMenuCardType>, Without<PauseMenuText>),
         >,
         text_query: &mut Query<&mut Transform, With<PauseMenuText>>,
         exit_tween_values: &mut ExitTweenValues<CardTween>,
@@ -105,7 +110,7 @@ impl PauseMenuCardTracker {
         next_state.set(PauseMenuState::RotatingCard);
         // 0 -> 4, 1 -> 0, 2 -> 1, 3 -> 2, 4 -> 3
         // tween z-values and scales
-        for (i, (mut animator_t, mut animator_s, mut transform)) in card_query
+        for (i, (mut animator_t, mut animator_s, transform)) in card_query
             .get_many_mut(self.cards)
             .unwrap()
             .into_iter()
@@ -154,9 +159,17 @@ impl PauseMenuCardTracker {
 
             let mut text_transform = text_query.get_mut(self.text_nodes[i]).unwrap();
 
-            transform.translation.z = self.transforms[new_index].translation.z;
             text_transform.translation.z = self.transforms[new_index].translation.z;
 
+            let z_tween = Tween::new(
+                EaseMethod::Linear,
+                Duration::from_secs_f32(CARD_ROTATION_DURATION),
+                TransformZValueLens {
+                    start: transform.translation.z,
+                    end: self.transforms[new_index].translation.z,
+                },
+            )
+            .with_completed_event(i as u64);
             let angle_tween = Tween::new(
                 EaseMethod::Linear,
                 Duration::from_secs_f32(CARD_ROTATION_DURATION),
@@ -192,12 +205,12 @@ impl PauseMenuCardTracker {
             )
             .with_completed_event(i as u64);
 
-            let combined = Tracks::new([angle_tween, scale_tween]);
+            let combined = Tracks::new([angle_tween, scale_tween, z_tween]);
             *animator_t = Animator::new(combined);
             *animator_s = Animator::new(color_tween);
         }
-        // 5 * 4 + 1
-        exit_tween_values.max = 13;
+        // 4 * 4 + 1
+        exit_tween_values.max = 17;
         match rotation_direction {
             RotationDirection::Clockwise => {
                 self.cards.rotate_right(1);

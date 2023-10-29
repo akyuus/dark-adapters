@@ -1,4 +1,4 @@
-use crate::model::tweenutils::PreserveQuatRotateYLens;
+use crate::utils::tweenutils::PreserveQuatRotateYLens;
 use crate::modes::dungeon::dungeonmode::DungeonAssets;
 use crate::modes::dungeon::model::cell::{GridPosType, GridPosition};
 use bevy::math::Vec3;

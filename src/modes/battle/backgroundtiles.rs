@@ -10,11 +10,11 @@ use bevy::sprite::Anchor;
 use bevy_tweening::lens::TransformPositionLens;
 use bevy_tweening::{Animator, EaseMethod, RepeatCount, Tween};
 
-use crate::model::spriteutils::{
+use crate::utils::spriteutils::{
     get_bottom_left_of_window, get_top_left_of_window, get_top_right_of_window,
     TextureAtlasSpriteLens,
 };
-use crate::model::tweenutils::ExitTweenValues;
+use crate::utils::tweenutils::ExitTweenValues;
 use crate::modes::battle::battlemode::BattleModeEntity;
 use crate::modes::battle::battlemoderesources::BattleModeAtlases;
 use crate::modes::mode_state::GameModeState;

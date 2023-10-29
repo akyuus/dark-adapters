@@ -1,4 +1,4 @@
-use crate::model::tweenutils::ExitTweenValues;
+use crate::utils::tweenutils::ExitTweenValues;
 use bevy::app::{App, PluginGroupBuilder};
 use bevy::core_pipeline::clear_color::ClearColorConfig;
 use bevy::prelude::*;
@@ -6,7 +6,8 @@ use bevy_asset_loader::prelude::{LoadingState, LoadingStateAppExt};
 
 use crate::modes::battle::backgroundtiles::{BackgroundTilePlugin, UnvacuumTween};
 use crate::modes::battle::battlemoderesources::{BattleModeAssets, BattleModeAtlases};
-use crate::modes::mode_state::{cleanup_system, GameModeState};
+use crate::modes::mode_state::GameModeState;
+use crate::utils::utilsystems::cleanup_system;
 
 pub struct BattleMode;
 
