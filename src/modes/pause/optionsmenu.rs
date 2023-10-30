@@ -57,23 +57,25 @@ fn handle_option_menu_nav_events(
         match res_option {
             ResolutionOptions::Small => {
                 window.resolution.set(BASE_WINDOW_WIDTH, BASE_WINDOW_HEIGHT);
+                window.position.center(MonitorSelection::Current);
             }
             ResolutionOptions::Medium => {
                 window
                     .resolution
                     .set(BASE_WINDOW_WIDTH * 2.0, BASE_WINDOW_HEIGHT * 2.0);
+                window.position.center(MonitorSelection::Current);
             }
             ResolutionOptions::Large => {
                 window
                     .resolution
                     .set(BASE_WINDOW_WIDTH * 2.5, BASE_WINDOW_HEIGHT * 2.5);
+                window.position.center(MonitorSelection::Current);
             }
             ResolutionOptions::Fullscreen => {
                 mode = WindowMode::BorderlessFullscreen;
             }
         }
         window.mode = mode;
-        window.position.center(MonitorSelection::Current);
     }
 }
 
