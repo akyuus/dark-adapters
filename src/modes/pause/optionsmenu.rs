@@ -4,12 +4,12 @@ use bevy::prelude::{
     EventReader, Input, IntoSystemConfigs, KeyCode, NextState, Plugin, Query, Res, ResMut, Update,
     Window, With,
 };
-use bevy::window::MonitorSelection;
+use bevy::window::{MonitorSelection, WindowMode};
 use bevy_ui_navigation::prelude::*;
 
 use crate::modes::mode_state::GameModeState;
 use crate::modes::pause::pausemode::{OptionsMenuRoot, PauseMenuState};
-use crate::utils::utilresources::WindowScaleFactor;
+use crate::utils::utilsystems::{BASE_WINDOW_HEIGHT, BASE_WINDOW_WIDTH};
 
 #[derive(Component)]
 struct OptionsMenu;
@@ -42,7 +42,6 @@ fn handle_option_menu_nav_events(
     mut next_state: ResMut<NextState<PauseMenuState>>,
     mut commands: Commands,
     input: Res<Input<KeyCode>>,
-    mut window_scale_factor: ResMut<WindowScaleFactor>,
 ) {
     if input.just_pressed(KeyCode::X) {
         next_state.set(PauseMenuState::Stationary);
@@ -54,24 +53,26 @@ fn handle_option_menu_nav_events(
 
     let mut window = windows.single_mut();
     for res_option in events.nav_iter().activated_in_query(&mut res_button_query) {
-        let mut scale_factor: f32 = window_scale_factor.0;
+        let mut mode = WindowMode::Windowed;
         match res_option {
             ResolutionOptions::Small => {
-                scale_factor = 1.;
+                window.resolution.set(BASE_WINDOW_WIDTH, BASE_WINDOW_HEIGHT);
             }
             ResolutionOptions::Medium => {
-                scale_factor = 2.;
+                window
+                    .resolution
+                    .set(BASE_WINDOW_WIDTH * 2.0, BASE_WINDOW_HEIGHT * 2.0);
             }
             ResolutionOptions::Large => {
-                scale_factor = 2.5;
+                window
+                    .resolution
+                    .set(BASE_WINDOW_WIDTH * 2.5, BASE_WINDOW_HEIGHT * 2.5);
             }
-            ResolutionOptions::Fullscreen => (),
+            ResolutionOptions::Fullscreen => {
+                mode = WindowMode::BorderlessFullscreen;
+            }
         }
-
-        window_scale_factor.0 = scale_factor;
-        window
-            .resolution
-            .set(640.0 * scale_factor, 360.0 * scale_factor);
+        window.mode = mode;
         window.position.center(MonitorSelection::Current);
     }
 }

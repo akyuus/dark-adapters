@@ -1,10 +1,17 @@
 use crate::utils::utilresources::WindowScaleFactor;
 use bevy::hierarchy::DespawnRecursiveExt;
 use bevy::prelude::{
-    Commands, Component, Entity, EventReader, Query, Res, Sprite, Text, Vec2, With,
+    Commands, Component, Entity, EventReader, Query, Res, ResMut, Sprite, Text,
+    Vec2, With,
 };
+
+
 use bevy::window::WindowResized;
 
+pub const BASE_WINDOW_WIDTH: f32 = 640.;
+pub const BASE_WINDOW_HEIGHT: f32 = 360.;
+
+pub const TARGET_RESOLUTION: f32 = 16. / 9.;
 pub fn cleanup_system<T: Component>(mut commands: Commands, q: Query<Entity, With<T>>) {
     for e in q.iter() {
         commands.entity(e).despawn_recursive();
@@ -56,5 +63,16 @@ pub fn resize_text_system(
         for section in text.sections.iter_mut() {
             section.style.font_size = scalable_text.base_size * scale_factor.0;
         }
+    }
+}
+
+pub fn update_scale_factor(
+    mut resize_reader: EventReader<WindowResized>,
+    mut window_scale_factor: ResMut<WindowScaleFactor>,
+) {
+    // TODO: ADAPTERS-56
+    for e in resize_reader.iter() {
+        let scale_factor = (e.width / BASE_WINDOW_WIDTH).min(e.height / BASE_WINDOW_HEIGHT);
+        window_scale_factor.0 = scale_factor;
     }
 }

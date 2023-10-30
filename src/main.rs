@@ -13,7 +13,7 @@ use crate::modes::mode_state::GameModeState;
 use crate::modes::pause::pausemode::PauseModePlugins;
 use crate::modes::sharedassets::shared::SharedAssetsPlugin;
 use crate::utils::utilresources::WindowScaleFactor;
-use crate::utils::utilsystems::{resize_sprite_system, resize_text_system};
+use crate::utils::utilsystems::{resize_sprite_system, resize_text_system, update_scale_factor};
 
 mod modes;
 mod utils;
@@ -44,9 +44,10 @@ fn main() {
             JsonAssetPlugin::<RawDungeonData>::new(&["dungeon.json"]),
             DefaultNavigationPlugins,
             LogDiagnosticsPlugin::default(),
-            FrameTimeDiagnosticsPlugin::default(),
+            FrameTimeDiagnosticsPlugin,
             // WorldInspectorPlugin::new(),
         ))
+        .add_systems(PreUpdate, update_scale_factor)
         .add_systems(
             Update,
             (

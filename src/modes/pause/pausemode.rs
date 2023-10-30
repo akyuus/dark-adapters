@@ -84,14 +84,16 @@ impl PauseMode {
     fn move_cards_on_window_resize(
         mut anchor_query: Query<&mut Transform, With<PauseMenuAnchor>>,
         mut card_query: Query<&mut Transform, (With<PauseMenuCardType>, Without<PauseMenuAnchor>)>,
+        window_query: Query<&Window>,
         mut resize_reader: EventReader<WindowResized>,
         mut pause_menu_card_tracker: ResMut<PauseMenuCardTracker>,
         window_scale_factor: Res<WindowScaleFactor>,
     ) {
         let mut anchor_transform = anchor_query.single_mut();
-        for e in resize_reader.iter() {
-            let anchor_point = Vec3::new(-e.width / 2.0, 0.0, 0.0);
-            println!("{}, {}", e.width, e.height);
+        let window = window_query.single();
+        for _ in resize_reader.iter() {
+            let anchor_point = get_middle_left_of_window(window);
+            println!("anchor point: {}", anchor_point);
             anchor_transform.translation = anchor_point;
             pause_menu_card_tracker.anchor_point = anchor_point;
             for (i, e) in pause_menu_card_tracker.cards.iter().enumerate() {
@@ -212,7 +214,6 @@ impl PauseMode {
 
         if esc_pressed || x_pressed_in_stationary_state {
             next_game_state.set(prev_state.0);
-            return;
         }
     }
     fn handle_menu_input(
